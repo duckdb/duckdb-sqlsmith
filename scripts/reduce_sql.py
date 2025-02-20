@@ -49,6 +49,7 @@ def sanitize_error(err):
     err = err.replace(os.getcwd(), '')
     err = re.sub(r'LINE \d+:.*\n', '', err)
     err = re.sub(r' *\^ *', '', err)
+    err = re.sub(r'0[xX][0-9a-fA-F]+', '', err)
     if 'AddressSanitizer' in err:
         match = re.search(r'[ \t]+[#]0 ([A-Za-z0-9]+) ([^\n]+)', err).groups()[1]
         err = 'AddressSanitizer error ' + match
