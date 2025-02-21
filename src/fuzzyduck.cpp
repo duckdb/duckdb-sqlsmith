@@ -22,14 +22,19 @@ void FuzzyDuck::BeginFuzzing() {
 	if (max_queries == 0) {
 		throw BinderException("Provide a max_queries argument greater than 0");
 	}
+	auto &fs = FileSystem::GetFileSystem(context);
 	if (!complete_log.empty()) {
-		auto &fs = FileSystem::GetFileSystem(context);
 		TryRemoveFile(complete_log);
 		complete_log_handle =
 			fs.OpenFile(complete_log, FileFlags::FILE_FLAGS_WRITE | FileFlags::FILE_FLAGS_FILE_CREATE_NEW);
 	}
 	if (enable_verification) {
 		RunQuery("PRAGMA enable_verification");
+	}
+	if (!randoms_config_filepath.empty()) {
+		config = RandomNumsConfig().GetConfigFromFile(randoms_config_filepath.c_str());
+	} else {
+		config = RandomNumsConfig().GetDefaultConfig();
 	}
 }
 
@@ -70,6 +75,7 @@ string FuzzyDuck::GenerateQuery() {
 	// generate statement
 	StatementGenerator generator(context);
 	generator.verification_enabled = enable_verification;
+	generator.config = config;
 	// accumulate statement(s)
 	auto statement = string("");
 	if (generator.RandomPercentage(10)) {
