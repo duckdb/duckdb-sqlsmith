@@ -73,7 +73,7 @@ def make_github_issue(title, body):
         raise Exception("Failed to create issue")
 
 
-def get_github_issues(page):
+def get_github_issues(page: int) -> list[dict]:
     session = create_session()
     url = issue_url() + '?per_page=100&page=' + str(page)
     r = session.get(url)
@@ -164,10 +164,10 @@ def test_reproducibility(shell, issue, current_errors, perform_check):
     return True
 
 
-def extract_github_issues(shell, perform_check):
-    current_errors = dict()
+def extract_github_issues(shell, perform_check) -> dict[str, dict]:
+    current_errors: dict[str, dict] = dict()
     for p in range(1, 10):
-        issues = get_github_issues(p)
+        issues: list[dict] = get_github_issues(p)
         for issue in issues:
             # check if the github issue is still reproducible
             if not test_reproducibility(shell, issue, current_errors, perform_check):

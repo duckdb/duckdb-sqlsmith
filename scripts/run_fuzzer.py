@@ -105,9 +105,9 @@ def run_shell_command(cmd):
 # first get a list of all github issues, and check if we can still reproduce them
 
 if no_git_checks:
-    current_errors = []
+    current_errors: dict[str, dict] = dict()
 else:
-    current_errors = fuzzer_helper.extract_github_issues(shell, perform_checks)
+    current_errors: dict[str, dict] = fuzzer_helper.extract_github_issues(shell, perform_checks)
 
 # Don't go on and fuzz if perform checks = true
 if perform_checks:
