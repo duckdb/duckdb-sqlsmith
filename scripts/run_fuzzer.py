@@ -184,17 +184,18 @@ if not fuzzer_helper.is_internal_error(stderr):
     exit(0)
 
 error_msg = reduce_sql.sanitize_error(stderr)
+exception_msg, stacktrace = fuzzer_helper.split_exception_trace(error_msg)
 
 print("=========================================")
 print("         Reproduced successfully         ")
 print("=========================================")
 
 # check if this is a duplicate issue
-if error_msg in current_errors:
+if exception_msg in current_errors:
     print("Skip filing duplicate issue")
     print(
         "Issue already exists: https://github.com/duckdb/duckdb-fuzzer/issues/"
-        + str(current_errors[error_msg]['number'])
+        + str(current_errors[exception_msg]['number'])
     )
     exit(0)
 
@@ -210,12 +211,23 @@ cmd = create_db_statement + '\n' + required_queries
 # get a new error message.
 (stdout, stderr, returncode) = run_shell_command(cmd)
 error_msg = reduce_sql.sanitize_error(stderr)
+exception_msg, stacktrace = fuzzer_helper.split_exception_trace(error_msg)
+
+# check if this is a duplicate issue
+if exception_msg in current_errors:
+    print("Skip filing duplicate issue")
+    print(
+        "Issue already exists: https://github.com/duckdb/duckdb-fuzzer/issues/"
+        + str(current_errors[exception_msg]['number'])
+    )
+    exit(0)
+
 
 print(f"================MARKER====================")
 print(f"After reducing: the below sql causes an internal error \n `{cmd}`")
-print(f"{error_msg}")
+print(f"{exception_msg}")
 print(f"================MARKER====================")
 
 if not no_git_checks:
     fuzzer_name_printable = get_fuzzer_name_printable(fuzzer)
-    fuzzer_helper.file_issue(cmd, error_msg, fuzzer_name_printable, seed, git_hash)
+    fuzzer_helper.file_issue(cmd, exception_msg, stacktrace, fuzzer_name_printable, seed, git_hash)

@@ -15,14 +15,21 @@ REPO_NAME = 'duckdb-fuzzer'
 fuzzer_desc = '''Issue found by ${FUZZER} on git commit hash [${SHORT_HASH}](https://github.com/duckdb/duckdb/commit/${FULL_HASH}) using seed ${SEED}.
 '''
 
-header = '''### To Reproduce
+sql_header = '''### To Reproduce
 ```sql
 '''
 
-middle = '''
+exception_header = '''
 ```
 
 ### Error Message
+```
+'''
+
+trace_header = '''
+```
+
+### Stack Trace
 ```
 '''
 
@@ -112,10 +119,10 @@ def label_github_issue(number, label):
 
 def extract_issue(body, nr):
     try:
-        splits = body.split(middle)
-        sql = splits[0].split(header)[1]
-        error = splits[1][: -len(footer)]
-        return (sql, error)
+        sql = body.split(sql_header)[1].split(exception_header)[0]
+        exception = body.split(exception_header)[1].split(trace_header)[0]
+        trace = body.split(trace_header)[1].split(footer)[0]
+        return (sql, exception, trace)
     except:
         print(f"Failed to extract SQL/error message from issue {nr}")
         print(body)
@@ -177,18 +184,18 @@ def extract_github_issues(shell, perform_check) -> dict[str, dict]:
     return current_errors
 
 
-def file_issue(cmd, error_msg, fuzzer, seed, hash):
+def file_issue(cmd, exception_msg, stacktrace, fuzzer, seed, hash):
     # issue is new, file it
     print("Filing new issue to Github")
 
-    title = error_msg
+    title = exception_msg
     body = (
         fuzzer_desc.replace("${FUZZER}", fuzzer)
         .replace("${FULL_HASH}", hash)
         .replace("${SHORT_HASH}", hash[:5])
         .replace("${SEED}", str(seed))
     )
-    body += header + cmd + middle + error_msg + footer
+    body += sql_header + cmd + exception_header + exception_msg + trace_header + stacktrace + footer
     print(title, body)
     make_github_issue(title, body)
 
@@ -205,3 +212,9 @@ def is_internal_error(error):
     if 'runtime error' in error:
         return True
     return False
+
+
+def split_exception_trace(exception_msg_full: str) -> tuple[str, str]:
+    # exception message does not contain newline, so split after first newline
+    exception_msg, _, stack_trace = exception_msg_full.partition('\n')
+    return (exception_msg.strip(), stack_trace.strip())
