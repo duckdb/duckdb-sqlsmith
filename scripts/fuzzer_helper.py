@@ -119,10 +119,16 @@ def label_github_issue(number, label):
 
 def extract_issue(body, nr):
     try:
-        sql = body.split(sql_header)[1].split(exception_header)[0]
-        exception = body.split(exception_header)[1].split(trace_header)[0]
-        trace = body.split(trace_header)[1].split(footer)[0]
-        return (sql, exception, trace)
+        if trace_header in body:
+            sql = body.split(sql_header)[1].split(exception_header)[0]
+            error = body.split(exception_header)[1].split(trace_header)[0]
+            trace = body.split(trace_header)[1].split(footer)[0]
+        else:
+            splits = body.split(exception_header)
+            sql = splits[0].split(sql_header)[1]
+            error = splits[1][: -len(footer)]
+            trace = ""
+        return (sql, error, trace)
     except:
         print(f"Failed to extract SQL/error message from issue {nr}")
         print(body)
