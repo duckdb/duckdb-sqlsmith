@@ -183,8 +183,7 @@ if not fuzzer_helper.is_internal_error(stderr):
     print("Failed to reproduce the internal error")
     exit(0)
 
-error_msg = reduce_sql.sanitize_error(stderr)
-exception_msg, stacktrace = fuzzer_helper.split_exception_trace(error_msg)
+exception_msg, stacktrace = fuzzer_helper.split_exception_trace(stderr)
 
 print("=========================================")
 print("         Reproduced successfully         ")
@@ -210,8 +209,7 @@ cmd = create_db_statement + '\n' + required_queries
 
 # get a new error message.
 (stdout, stderr, returncode) = run_shell_command(cmd)
-error_msg = reduce_sql.sanitize_error(stderr)
-exception_msg, stacktrace = fuzzer_helper.split_exception_trace(error_msg)
+exception_msg, stacktrace = fuzzer_helper.split_exception_trace(stderr)
 
 # check if this is a duplicate issue
 if exception_msg in current_errors:
