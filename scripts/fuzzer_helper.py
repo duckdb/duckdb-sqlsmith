@@ -15,14 +15,21 @@ REPO_NAME = 'duckdb-fuzzer'
 fuzzer_desc = '''Issue found by ${FUZZER} on git commit hash [${SHORT_HASH}](https://github.com/duckdb/duckdb/commit/${FULL_HASH}) using seed ${SEED}.
 '''
 
-header = '''### To Reproduce
+sql_header = '''### To Reproduce
 ```sql
 '''
 
-middle = '''
+exception_header = '''
 ```
 
 ### Error Message
+```
+'''
+
+trace_header = '''
+```
+
+### Stack Trace
 ```
 '''
 
@@ -73,7 +80,7 @@ def make_github_issue(title, body):
         raise Exception("Failed to create issue")
 
 
-def get_github_issues(page):
+def get_github_issues(page: int) -> list[dict]:
     session = create_session()
     url = issue_url() + '?per_page=100&page=' + str(page)
     r = session.get(url)
@@ -112,10 +119,16 @@ def label_github_issue(number, label):
 
 def extract_issue(body, nr):
     try:
-        splits = body.split(middle)
-        sql = splits[0].split(header)[1]
-        error = splits[1][: -len(footer)]
-        return (sql, error)
+        if trace_header in body:
+            sql = body.split(sql_header)[1].split(exception_header)[0]
+            error = body.split(exception_header)[1].split(trace_header)[0]
+            trace = body.split(trace_header)[1].split(footer)[0]
+        else:
+            splits = body.split(exception_header)
+            sql = splits[0].split(sql_header)[1]
+            error = splits[1][: -len(footer)]
+            trace = ""
+        return (sql, error, trace)
     except:
         print(f"Failed to extract SQL/error message from issue {nr}")
         print(body)
@@ -164,10 +177,10 @@ def test_reproducibility(shell, issue, current_errors, perform_check):
     return True
 
 
-def extract_github_issues(shell, perform_check):
-    current_errors = dict()
+def extract_github_issues(shell, perform_check) -> dict[str, dict]:
+    current_errors: dict[str, dict] = dict()
     for p in range(1, 10):
-        issues = get_github_issues(p)
+        issues: list[dict] = get_github_issues(p)
         for issue in issues:
             # check if the github issue is still reproducible
             if not test_reproducibility(shell, issue, current_errors, perform_check):
@@ -177,18 +190,18 @@ def extract_github_issues(shell, perform_check):
     return current_errors
 
 
-def file_issue(cmd, error_msg, fuzzer, seed, hash):
+def file_issue(cmd, exception_msg, stacktrace, fuzzer, seed, hash):
     # issue is new, file it
     print("Filing new issue to Github")
 
-    title = error_msg
+    title = exception_msg
     body = (
         fuzzer_desc.replace("${FUZZER}", fuzzer)
         .replace("${FULL_HASH}", hash)
         .replace("${SHORT_HASH}", hash[:5])
         .replace("${SEED}", str(seed))
     )
-    body += header + cmd + middle + error_msg + footer
+    body += sql_header + cmd + exception_header + exception_msg + trace_header + stacktrace + footer
     print(title, body)
     make_github_issue(title, body)
 
@@ -205,3 +218,9 @@ def is_internal_error(error):
     if 'runtime error' in error:
         return True
     return False
+
+
+def split_exception_trace(exception_msg_full: str) -> tuple[str, str]:
+    # exception message does not contain newline, so split after first newline
+    exception_msg, _, stack_trace = exception_msg_full.partition('\n')
+    return (exception_msg.strip(), stack_trace.strip())

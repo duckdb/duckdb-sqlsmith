@@ -129,13 +129,13 @@ print('----------------------------------------------')
 print(reduced_test_case)
 
 (stdout, stderr, returncode) = reduce_sql.run_shell_command(shell, reduced_test_case)
-error_msg = reduce_sql.sanitize_error(stderr)
+error_msg, _ = fuzzer_helper.split_exception_trace(stderr)
 
 print('----------------------------------------------')
 print("Fetching github issues")
 print('----------------------------------------------')
 
-# first get a list of all github issues, and check if we can still reproduce them
+# first get a dictinary of all github issues, and check if we can still reproduce them
 current_errors = fuzzer_helper.extract_github_issues(shell)
 
 # check if this is a duplicate issue
