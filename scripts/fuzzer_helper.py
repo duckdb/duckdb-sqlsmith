@@ -3,6 +3,7 @@ import requests
 import os
 import subprocess
 import urllib.parse
+import re
 
 
 USERNAME = 'fuzzerofducks'
@@ -242,7 +243,14 @@ def is_internal_error(error):
     return False
 
 
+def sanitize_stacktrace(err):
+    err = re.sub(r'../duckdb\((.*)\)', r'\1', err)
+    err = re.sub(r'[\+\[]?0x[0-9a-fA-F]+\]?', '', err)
+    err = re.sub(r'/lib/x86_64-linux-gnu/libc.so(.*)\n', '', err)
+    return err.strip()
+
+
 def split_exception_trace(exception_msg_full: str) -> tuple[str, str]:
     # exception message does not contain newline, so split after first newline
     exception_msg, _, stack_trace = exception_msg_full.partition('\n')
-    return (exception_msg.strip(), stack_trace.strip())
+    return (exception_msg.strip(), sanitize_stacktrace(stack_trace))
