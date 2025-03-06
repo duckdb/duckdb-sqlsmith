@@ -43,7 +43,7 @@ def issue_url():
 
 def issues_by_title_url(issue_title):
     base_url = "https://api.github.com/search/issues"
-    query_string = urllib.parse.quote(f"repo:{REPO_OWNER}/{REPO_NAME} {issue_title} in:title")
+    query_string = urllib.parse.quote(f"repo:{REPO_OWNER}/{REPO_NAME} {issue_title} in:title is:open")
     return f"{base_url}?q={query_string}"
 
 
