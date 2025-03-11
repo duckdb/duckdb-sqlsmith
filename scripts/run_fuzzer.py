@@ -201,7 +201,7 @@ print("         Reproduced successfully         ")
 print("=========================================")
 
 # check if this is a duplicate issue
-if is_known_issue(exception_msg):
+if (not no_git_checks) and is_known_issue(exception_msg):
     exit(0)
 
 print("=========================================")
@@ -218,7 +218,7 @@ cmd = create_db_statement + '\n' + required_queries
 exception_msg, stacktrace = fuzzer_helper.split_exception_trace(stderr)
 
 # check if this is a duplicate issue
-if is_known_issue(exception_msg):
+if (not no_git_checks) and is_known_issue(exception_msg):
     exit(0)
 
 print(f"================MARKER====================")
