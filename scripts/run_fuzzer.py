@@ -102,15 +102,26 @@ def run_shell_command(cmd):
     return (stdout, stderr, res.returncode)
 
 
-# first get a list of all github issues, and check if we can still reproduce them
+def is_known_issue(exception_msg):
+    existing_issues = fuzzer_helper.get_github_issues_by_title(exception_msg)
+    if existing_issues:
+        print("Skip filing duplicate issue")
+        print(
+            "Issue already exists: https://github.com/duckdb/duckdb-fuzzer/issues/"
+            + str(existing_issues[0]['number'])
+        )
+        return True
+    else:
+        return False
 
-if no_git_checks:
-    current_errors: dict[str, dict] = dict()
-else:
-    current_errors: dict[str, dict] = fuzzer_helper.extract_github_issues(shell, perform_checks)
+
+# ==========================================
+#              START OF SCRIPT
+# ==========================================
 
 # Don't go on and fuzz if perform checks = true
 if perform_checks:
+    fuzzer_helper.close_non_reproducible_issues(shell)
     exit(0)
 
 last_query_log_file = 'sqlsmith.log'
@@ -190,12 +201,7 @@ print("         Reproduced successfully         ")
 print("=========================================")
 
 # check if this is a duplicate issue
-if exception_msg in current_errors:
-    print("Skip filing duplicate issue")
-    print(
-        "Issue already exists: https://github.com/duckdb/duckdb-fuzzer/issues/"
-        + str(current_errors[exception_msg]['number'])
-    )
+if (not no_git_checks) and is_known_issue(exception_msg):
     exit(0)
 
 print("=========================================")
@@ -212,14 +218,8 @@ cmd = create_db_statement + '\n' + required_queries
 exception_msg, stacktrace = fuzzer_helper.split_exception_trace(stderr)
 
 # check if this is a duplicate issue
-if exception_msg in current_errors:
-    print("Skip filing duplicate issue")
-    print(
-        "Issue already exists: https://github.com/duckdb/duckdb-fuzzer/issues/"
-        + str(current_errors[exception_msg]['number'])
-    )
+if (not no_git_checks) and is_known_issue(exception_msg):
     exit(0)
-
 
 print(f"================MARKER====================")
 print(f"After reducing: the below sql causes an internal error \n `{cmd}`")

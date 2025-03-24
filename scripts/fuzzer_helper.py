@@ -1,10 +1,9 @@
 import json
 import requests
-import sys
 import os
 import subprocess
-import reduce_sql
-import fuzzer_helper
+import urllib.parse
+import re
 
 
 USERNAME = 'fuzzerofducks'
@@ -40,6 +39,12 @@ footer = '''
 # github stuff
 def issue_url():
     return 'https://api.github.com/repos/%s/%s/issues' % (REPO_OWNER, REPO_NAME)
+
+
+def issues_by_title_url(issue_title):
+    base_url = "https://api.github.com/search/issues"
+    query_string = urllib.parse.quote(f"repo:{REPO_OWNER}/{REPO_NAME} {issue_title} in:title is:open")
+    return f"{base_url}?q={query_string}"
 
 
 def get_token():
@@ -80,7 +85,7 @@ def make_github_issue(title, body):
         raise Exception("Failed to create issue")
 
 
-def get_github_issues(page: int) -> list[dict]:
+def get_github_issues_per_page(page: int) -> list[dict]:
     session = create_session()
     url = issue_url() + '?per_page=100&page=' + str(page)
     r = session.get(url)
@@ -89,6 +94,18 @@ def get_github_issues(page: int) -> list[dict]:
         print('Response:', r.content.decode('utf8'))
         raise Exception("Failed to get list of issues")
     return json.loads(r.content.decode('utf8'))
+
+
+def get_github_issues_by_title(issue_title) -> list[dict]:
+    session = create_session()
+    url = issues_by_title_url(issue_title)
+    r = session.get(url)
+    if r.status_code != 200:
+        print('Failed to query the issues')
+        print('Response:', r.content.decode('utf8'))
+        raise Exception("Failed to query the issues")
+    issue_list = r.json().get("items", [])
+    return issue_list
 
 
 def close_github_issue(number):
@@ -150,7 +167,7 @@ def run_shell_command_batch(shell, cmd):
     return (stdout, stderr, res.returncode, False)
 
 
-def test_reproducibility(shell, issue, current_errors, perform_check):
+def is_reproducible_issue(shell, issue) -> bool:
     extract = extract_issue(issue['body'], issue['number'])
     labels = issue['labels']
     label_timeout = False
@@ -161,8 +178,7 @@ def test_reproducibility(shell, issue, current_errors, perform_check):
         # failed extract: leave the issue as-is
         return True
     sql = extract[0] + ';'
-    error = extract[1]
-    if perform_check is True and label_timeout is False:
+    if label_timeout is False:
         print(f"Checking issue {issue['number']}...")
         (stdout, stderr, returncode, is_timeout) = run_shell_command_batch(shell, sql)
         if is_timeout:
@@ -170,24 +186,31 @@ def test_reproducibility(shell, issue, current_errors, perform_check):
         else:
             if returncode == 0:
                 return False
-            if not fuzzer_helper.is_internal_error(stderr):
+            if not is_internal_error(stderr):
                 return False
     # issue is still reproducible
-    current_errors[error] = issue
     return True
 
 
-def extract_github_issues(shell, perform_check) -> dict[str, dict]:
-    current_errors: dict[str, dict] = dict()
+def get_github_issues_list() -> list[dict]:
+    issues: list[dict] = []
     for p in range(1, 10):
-        issues: list[dict] = get_github_issues(p)
-        for issue in issues:
-            # check if the github issue is still reproducible
-            if not test_reproducibility(shell, issue, current_errors, perform_check):
-                # the issue appears to be fixed - close the issue
-                print(f"Failed to reproduce issue {issue['number']}, closing...")
-                close_github_issue(int(issue['number']))
-    return current_errors
+        issues = issues + get_github_issues_per_page(p)
+    return issues
+
+
+# closes non-reproducible issues; returns reproducible issues
+def close_non_reproducible_issues(shell) -> dict[str, dict]:
+    reproducible_issues: dict[str, dict] = {}
+    for issue in get_github_issues_list():
+        if not is_reproducible_issue(shell, issue):
+            # the issue appears to be fixed - close the issue
+            print(f"Failed to reproduce issue {issue['number']}, closing...")
+            close_github_issue(int(issue['number']))
+        else:
+            reproducible_issues[issue['title']] = issue
+    # retun open issues as dict, so they can be searched by title, which is the exception message without trace
+    return reproducible_issues
 
 
 def file_issue(cmd, exception_msg, stacktrace, fuzzer, seed, hash):
@@ -220,7 +243,14 @@ def is_internal_error(error):
     return False
 
 
+def sanitize_stacktrace(err):
+    err = re.sub(r'../duckdb\((.*)\)', r'\1', err)
+    err = re.sub(r'[\+\[]?0x[0-9a-fA-F]+\]?', '', err)
+    err = re.sub(r'/lib/x86_64-linux-gnu/libc.so(.*)\n', '', err)
+    return err.strip()
+
+
 def split_exception_trace(exception_msg_full: str) -> tuple[str, str]:
     # exception message does not contain newline, so split after first newline
     exception_msg, _, stack_trace = exception_msg_full.partition('\n')
-    return (exception_msg.strip(), stack_trace.strip())
+    return (exception_msg.strip(), sanitize_stacktrace(stack_trace))
