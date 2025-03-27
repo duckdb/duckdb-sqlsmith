@@ -1,4 +1,3 @@
-import re
 import subprocess
 import time
 import os
@@ -43,18 +42,6 @@ class MultiStatementManager:
         return self.statements[-1]
 
 
-def sanitize_error(err):
-    err = re.sub(r'Error: near line \d+: ', '', err)
-    err = err.replace(os.getcwd() + '/', '')
-    err = err.replace(os.getcwd(), '')
-    err = re.sub(r'LINE \d+:.*\n', '', err)
-    err = re.sub(r' *\^ *', '', err)
-    if 'AddressSanitizer' in err:
-        match = re.search(r'[ \t]+[#]0 ([A-Za-z0-9]+) ([^\n]+)', err).groups()[1]
-        err = 'AddressSanitizer error ' + match
-    return err.strip()
-
-
 def run_shell_command(shell, cmd):
     command = [shell, '-csv', '--batch', '-init', '/dev/null']
 
@@ -96,7 +83,7 @@ def reduce(sql_query, data_load, shell, error_msg, max_time_seconds=300):
                 break
 
             (stdout, stderr, returncode) = run_shell_command(shell, data_load + reduce_candidate)
-            new_error = sanitize_error(stderr)
+            new_error, _ = fuzzer_helper.split_exception_trace(stderr)
             if new_error == error_msg:
                 sql_query = reduce_candidate
                 found_new_candidate = True
@@ -147,9 +134,9 @@ def run_queries_until_crash_mp(local_shell, data_load, queries, result_file):
 
         keep_query = is_ddl_query(q)
         (stdout, stderr, returncode) = run_shell_command(local_shell, '\n'.join(data_load) + ';' + q)
-     
+
         is_internal_error = fuzzer_helper.is_internal_error(stderr)
-        exception_error = sanitize_error(stderr).strip()
+        exception_error, _ = fuzzer_helper.split_exception_trace(stderr)
         if is_internal_error and len(expected_error) > 0:
             keep_query = True
             sqlite_con.execute('UPDATE result SET text=?', (exception_error,))
@@ -232,7 +219,7 @@ def reduce_multi_statement(sql_queries, local_shell, local_data_load, max_time=3
     last_statement = reducer.get_last_statement()
     print(f"testing if just last statement of multi statement creates the error")
     (stdout, stderr, returncode) = run_shell_command(local_shell, local_data_load + last_statement)
-    expected_error = sanitize_error(stderr).strip()
+    expected_error, _ = fuzzer_helper.split_exception_trace(stderr)
     if len(expected_error) > 0:
         print(f"Expected error is {expected_error}")
     else:
@@ -301,7 +288,7 @@ if __name__ == "__main__":
     sql_query = open(args.exec).read()
     verbose = args.verbose
     (stdout, stderr, returncode) = run_shell_command(shell, data_load + sql_query)
-    expected_error = sanitize_error(stderr).strip()
+    expected_error, _ = fuzzer_helper.split_exception_trace(stderr)
     if len(expected_error) == 0:
         print("===================================================")
         print("Could not find expected error - no error encountered")

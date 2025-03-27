@@ -129,22 +129,22 @@ print('----------------------------------------------')
 print(reduced_test_case)
 
 (stdout, stderr, returncode) = reduce_sql.run_shell_command(shell, reduced_test_case)
-error_msg = reduce_sql.sanitize_error(stderr)
+error_msg, trace = fuzzer_helper.split_exception_trace(stderr)
 
 print('----------------------------------------------')
 print("Fetching github issues")
 print('----------------------------------------------')
 
-# first get a list of all github issues, and check if we can still reproduce them
-current_errors = fuzzer_helper.extract_github_issues(shell)
+# get a dictinary with all open github issues (close the non-reproducible ones)
+open_issues = fuzzer_helper.close_non_reproducible_issues(shell)
 
 # check if this is a duplicate issue
-if error_msg in current_errors:
+if error_msg in open_issues:
     print("Skip filing duplicate issue")
     print(
         "Issue already exists: https://github.com/duckdb/duckdb-fuzzer/issues/"
-        + str(current_errors[error_msg]['number'])
+        + str(open_issues[error_msg]['number'])
     )
     exit(0)
 
-fuzzer_helper.file_issue(reduced_test_case, error_msg, "SQLancer", seed, git_hash)
+fuzzer_helper.file_issue(reduced_test_case, error_msg, trace, "SQLancer", seed, git_hash)

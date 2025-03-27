@@ -36,6 +36,12 @@ jobs:
       - name: Setup Ccache
         uses: hendrikmuhs/ccache-action@main
 
+      - name: Build
+        shell: bash
+        run: |
+          make debug
+
+      # we don't build with Ninja because the github machines kill the process otherwise
       - name: Build and Test
         shell: bash
         run: |
