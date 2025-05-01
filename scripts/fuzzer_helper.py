@@ -73,6 +73,8 @@ def make_github_issue(title, body):
     if len(title) > 240:
         #  avoid title is too long error (maximum is 256 characters)
         title = title[:240] + '...'
+    if len(body) > 60000:
+        body = body[:60000] + '... (body of github issue is truncated)'
     session = create_session()
     url = issue_url()
     issue = {'title': title, 'body': body}
