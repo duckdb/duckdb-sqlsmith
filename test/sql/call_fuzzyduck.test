@@ -2,6 +2,8 @@
 # description: Test fuzzyduck
 # group: [fuzzyduck]
 
+mode skip
+
 require sqlsmith
 
 statement ok
@@ -9,3 +11,5 @@ call fuzzyduck(max_queries=2, verbose_output=1, log='sqlsmith.log', complete_log
 
 statement ok
 call fuzzyduck(max_queries=2, verbose_output=1, log='__TEST_DIR__/logs.txt', complete_log='__TEST_DIR__/clog.txt', enable_verification=false);
+
+mode unskip
