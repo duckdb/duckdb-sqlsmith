@@ -6,4 +6,3 @@ duckdb_unittest_tempdir/
 testext
 scripts/__pycache__/
 test/python/__pycache__/
-.Rhistory
