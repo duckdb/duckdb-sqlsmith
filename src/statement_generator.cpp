@@ -34,7 +34,7 @@ struct GeneratorContext {
 	vector<reference<CatalogEntry>> table_functions;
 	vector<reference<CatalogEntry>> pragma_functions;
 	vector<reference<CatalogEntry>> tables_and_views;
-	vector<reference<AttachedDatabase>> attached_databases;
+	vector<shared_ptr<AttachedDatabase>> attached_databases;
 };
 
 StatementGenerator::StatementGenerator(ClientContext &context) : context(context), parent(nullptr), depth(0) {
@@ -216,8 +216,8 @@ unique_ptr<DetachInfo> StatementGenerator::GenerateDetachInfo() {
 
 std::string StatementGenerator::GetRandomAttachedDataBase() {
 	auto state = GetDatabaseState(context);
-	auto st_name = state->attached_databases[RandomValue(state->attached_databases.size())];
-	auto name = st_name.get().name;
+	auto &st_name = *state->attached_databases[RandomValue(state->attached_databases.size())];
+	auto name = st_name.name;
 	return name;
 }
 
