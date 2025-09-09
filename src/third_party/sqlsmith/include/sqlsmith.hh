@@ -12,6 +12,7 @@ namespace duckdb_sqlsmith {
 struct SQLSmithOptions {
 	int32_t seed = -1;
 	uint64_t max_queries = 0;
+	uint64_t max_query_length = 0;
 	bool exclude_catalog = false;
 	bool dump_all_queries = false;
 	bool dump_all_graphs = false;

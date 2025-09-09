@@ -16,6 +16,7 @@ struct SQLSmithFunctionData : public TableFunctionData {
 
 	int32_t seed = -1;
 	idx_t max_queries = 0;
+	idx_t max_query_length = 0;
 	bool exclude_catalog = false;
 	bool dump_all_queries = false;
 	bool dump_all_graphs = false;
@@ -34,6 +35,8 @@ static duckdb::unique_ptr<FunctionData> SQLSmithBind(ClientContext &context, Tab
 			result->seed = IntegerValue::Get(kv.second);
 		} else if (kv.first == "max_queries") {
 			result->max_queries = UBigIntValue::Get(kv.second);
+		} else if (kv.first == "max_query_length") {
+			result->max_query_length = UBigIntValue::Get(kv.second);
 		} else if (kv.first == "exclude_catalog") {
 			result->exclude_catalog = BooleanValue::Get(kv.second);
 		} else if (kv.first == "dump_all_queries") {
@@ -62,6 +65,7 @@ static void SQLSmithFunction(ClientContext &context, TableFunctionInput &data_p,
 	duckdb_sqlsmith::SQLSmithOptions options;
 	options.seed = data.seed;
 	options.max_queries = data.max_queries;
+	options.max_query_length = data.max_query_length;
 	options.exclude_catalog = data.exclude_catalog;
 	options.dump_all_queries = data.dump_all_queries;
 	options.dump_all_graphs = data.dump_all_graphs;
@@ -173,6 +177,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 	TableFunction sqlsmith_func("sqlsmith", {}, SQLSmithFunction, SQLSmithBind);
 	sqlsmith_func.named_parameters["seed"] = LogicalType::INTEGER;
 	sqlsmith_func.named_parameters["max_queries"] = LogicalType::UBIGINT;
+	sqlsmith_func.named_parameters["max_query_length"] = LogicalType::UBIGINT;
 	sqlsmith_func.named_parameters["exclude_catalog"] = LogicalType::BOOLEAN;
 	sqlsmith_func.named_parameters["dump_all_queries"] = LogicalType::BOOLEAN;
 	sqlsmith_func.named_parameters["dump_all_graphs"] = LogicalType::BOOLEAN;

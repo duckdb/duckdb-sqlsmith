@@ -1,5 +1,3 @@
-import json
-import requests
 import sys
 import os
 import subprocess
@@ -15,6 +13,7 @@ shell = None
 perform_checks = True
 no_git_checks = False
 max_queries = 1000
+max_query_length = 40000
 verification = False
 
 for param in sys.argv:
@@ -40,6 +39,8 @@ for param in sys.argv:
         seed = int(param.replace('--seed=', ''))
     elif param.startswith('--max_queries='):
         max_queries = int(param.replace('--max_queries=', ''))
+    elif param.startswith('--max_query_length='):
+        max_query_length = int(param.replace('--max_query_length=', ''))
     elif param.startswith('--no-git-checks'):
         no_git_checks = param.replace('--no-git-checks=', '').lower() == 'true'
 
@@ -74,7 +75,7 @@ def get_create_db_statement(db):
 
 def get_fuzzer_call_statement(fuzzer):
     if fuzzer == 'sqlsmith':
-        return "call sqlsmith(max_queries=${MAX_QUERIES}, seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}');"
+        return "call sqlsmith(max_queries=${MAX_QUERIES}, max_query_length=${MAX_QUERY_LENGTH}, seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}');"
     elif fuzzer == 'duckfuzz':
         return "call fuzzyduck(max_queries=${MAX_QUERIES}, seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}', enable_verification='${ENABLE_VERIFICATION}');"
     elif fuzzer == 'duckfuzz_functions':
@@ -138,6 +139,7 @@ create_db_statement = get_create_db_statement(db)
 call_fuzzer_statement = (
     get_fuzzer_call_statement(fuzzer)
     .replace('${MAX_QUERIES}', str(max_queries))
+    .replace('${MAX_QUERY_LENGTH}', str(max_query_length))
     .replace('${LAST_LOG_FILE}', last_query_log_file)
     .replace('${COMPLETE_LOG_FILE}', complete_log_file)
     .replace('${SEED}', str(seed))
