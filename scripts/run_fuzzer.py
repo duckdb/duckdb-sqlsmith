@@ -79,7 +79,7 @@ def get_fuzzer_call_statement(fuzzer):
     elif fuzzer == 'duckfuzz':
         return "call fuzzyduck(max_queries=${MAX_QUERIES}, max_query_length=${MAX_QUERY_LENGTH}, seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}', enable_verification='${ENABLE_VERIFICATION}');"
     elif fuzzer == 'duckfuzz_functions':
-        return "call fuzz_all_functions(seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}');"
+        return "call fuzz_all_functions(seed=${SEED}, max_query_length=${MAX_QUERY_LENGTH}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}');"
     else:
         raise Exception("Unknown fuzzer type")
 

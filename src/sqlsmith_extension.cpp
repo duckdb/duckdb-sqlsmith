@@ -200,6 +200,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 
 	TableFunction fuzz_all_functions("fuzz_all_functions", {}, FuzzAllFunctions, FuzzyDuckBind);
 	fuzz_all_functions.named_parameters["seed"] = LogicalType::INTEGER;
+	fuzz_all_functions.named_parameters["max_query_length"] = LogicalType::UBIGINT;
 	fuzz_all_functions.named_parameters["log"] = LogicalType::VARCHAR;
 	fuzz_all_functions.named_parameters["complete_log"] = LogicalType::VARCHAR;
 	fuzz_all_functions.named_parameters["verbose_output"] = LogicalType::BOOLEAN;

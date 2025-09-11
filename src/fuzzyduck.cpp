@@ -49,9 +49,9 @@ void FuzzyDuck::Fuzz() {
 	for (idx_t i = 0; i < max_queries; i++) {
 		LogMessage("Query " + to_string(i) + "\n");
 		auto query = GenerateQuery(total_query_length);
-		total_query_length += query.size();
+		total_query_length += query.size() + 2; // add 2 for semicolon and newline
 		if (total_query_length > max_query_length) {
-			LogTask("Max query length (" + to_string(max_query_length) + ") reached.");
+			LogTask("Max query length (" + to_string(max_query_length) + ") reached");
 			break;
 		}
 		RunQuery(std::move(query));
@@ -69,8 +69,14 @@ void FuzzyDuck::FuzzAllFunctions() {
 
 	std::default_random_engine e(seed);
 	std::shuffle(std::begin(queries), std::end(queries), e);
+	idx_t total_query_length = 0;
 	BeginFuzzing();
 	for (auto &query : queries) {
+		total_query_length += query.size() + 2; // add 2 for semicolon and newline
+		if (total_query_length > max_query_length) {
+			LogTask("Max query length (" + to_string(max_query_length) + ") reached");
+			break;
+		}
 		RunQuery(std::move(query));
 	}
 	EndFuzzing();
