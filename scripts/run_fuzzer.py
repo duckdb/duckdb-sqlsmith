@@ -13,7 +13,7 @@ shell = None
 perform_checks = True
 no_git_checks = False
 max_queries = 1000
-max_query_length = 40000
+max_query_length = 50000
 verification = False
 
 for param in sys.argv:
@@ -77,7 +77,7 @@ def get_fuzzer_call_statement(fuzzer):
     if fuzzer == 'sqlsmith':
         return "call sqlsmith(max_queries=${MAX_QUERIES}, max_query_length=${MAX_QUERY_LENGTH}, seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}');"
     elif fuzzer == 'duckfuzz':
-        return "call fuzzyduck(max_queries=${MAX_QUERIES}, seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}', enable_verification='${ENABLE_VERIFICATION}');"
+        return "call fuzzyduck(max_queries=${MAX_QUERIES}, max_query_length=${MAX_QUERY_LENGTH}, seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}', enable_verification='${ENABLE_VERIFICATION}');"
     elif fuzzer == 'duckfuzz_functions':
         return "call fuzz_all_functions(seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}');"
     else:

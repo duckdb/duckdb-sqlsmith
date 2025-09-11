@@ -137,6 +137,8 @@ static duckdb::unique_ptr<FunctionData> FuzzyDuckBind(ClientContext &context, Ta
 			result->fuzzer.seed = IntegerValue::Get(kv.second);
 		} else if (kv.first == "max_queries") {
 			result->fuzzer.max_queries = UBigIntValue::Get(kv.second);
+		} else if (kv.first == "max_query_length") {
+			result->fuzzer.max_query_length = UBigIntValue::Get(kv.second);
 		} else if (kv.first == "complete_log") {
 			result->fuzzer.complete_log = StringValue::Get(kv.second);
 		} else if (kv.first == "log") {
@@ -189,6 +191,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 	TableFunction fuzzy_duck_fun("fuzzyduck", {}, FuzzyDuckFunction, FuzzyDuckBind);
 	fuzzy_duck_fun.named_parameters["seed"] = LogicalType::INTEGER;
 	fuzzy_duck_fun.named_parameters["max_queries"] = LogicalType::UBIGINT;
+	fuzzy_duck_fun.named_parameters["max_query_length"] = LogicalType::UBIGINT;
 	fuzzy_duck_fun.named_parameters["log"] = LogicalType::VARCHAR;
 	fuzzy_duck_fun.named_parameters["complete_log"] = LogicalType::VARCHAR;
 	fuzzy_duck_fun.named_parameters["verbose_output"] = LogicalType::BOOLEAN;
