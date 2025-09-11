@@ -102,7 +102,6 @@ private:
 	unique_ptr<OrderModifier> GenerateOrderBy();
 	unique_ptr<OrderModifier> GenerateOrderByAll();
 
-
 	LogicalType GenerateLogicalType();
 
 	void GenerateAllScalar(ScalarFunctionCatalogEntry &scalar_function, vector<string> &result);

@@ -231,5 +231,4 @@ extern "C" {
 DUCKDB_CPP_EXTENSION_ENTRY(sqlsmith, loader) {
 	duckdb::LoadInternal(loader);
 }
-
 }

@@ -29,7 +29,7 @@ void FuzzyDuck::BeginFuzzing() {
 		auto &fs = FileSystem::GetFileSystem(context);
 		TryRemoveFile(complete_log);
 		complete_log_handle =
-			fs.OpenFile(complete_log, FileFlags::FILE_FLAGS_WRITE | FileFlags::FILE_FLAGS_FILE_CREATE_NEW);
+		    fs.OpenFile(complete_log, FileFlags::FILE_FLAGS_WRITE | FileFlags::FILE_FLAGS_FILE_CREATE_NEW);
 	}
 	if (enable_verification) {
 		RunQuery("PRAGMA enable_verification");
