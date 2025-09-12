@@ -51,6 +51,7 @@ void FuzzyDuck::Fuzz() {
 		auto query = GenerateQuery(total_query_length);
 		total_query_length += query.size() + 2; // add 2 for semicolon and newline
 		if (total_query_length > max_query_length) {
+			// break to prevent the query gets too large to process down-stream (e.g. should fit in issue tracker)
 			LogTask("Max query length (" + to_string(max_query_length) + ") reached");
 			break;
 		}
@@ -74,6 +75,7 @@ void FuzzyDuck::FuzzAllFunctions() {
 	for (auto &query : queries) {
 		total_query_length += query.size() + 2; // add 2 for semicolon and newline
 		if (total_query_length > max_query_length) {
+			// break to prevent the query gets too large to process down-stream (e.g. should fit in issue tracker)
 			LogTask("Max query length (" + to_string(max_query_length) + ") reached");
 			break;
 		}
@@ -98,6 +100,7 @@ string FuzzyDuck::GenerateQuery(const idx_t &total_query_length) {
 		for (idx_t i = 0; i < number_of_statements; i++) {
 			statement_i = generator.GenerateStatement()->ToString() + "; ";
 			length_statement_to_add = statement_i.size();
+			// break to prevent the query gets too large to process down-stream (e.g. should fit in issue tracker)
 			if (total_query_length + length_multi_statement + length_statement_to_add > max_query_length) {
 				break;
 			}

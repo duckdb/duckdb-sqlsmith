@@ -160,6 +160,8 @@ int32_t run_sqlsmith(duckdb::DatabaseInstance &database, SQLSmithOptions opt) {
 				ostringstream s;
 				gen->out(s);
 
+				// break to prevent the query gets too large to process down-stream
+				// e.g. should fit in issue tracker
 				length_queries_generated += s.str().size();
 				if (opt.max_query_length > 0 && length_queries_generated > opt.max_query_length) {
 					if (global_cerr_logger)
@@ -167,8 +169,7 @@ int32_t run_sqlsmith(duckdb::DatabaseInstance &database, SQLSmithOptions opt) {
 					return 0;
 				}
 
-				// write the query to the complete log that has all the
-				// queries
+				// write the query to the complete log that has all the queries
 				if (has_complete_log) {
 					complete_log << s.str() << ";" << endl;
 					complete_log.flush();
