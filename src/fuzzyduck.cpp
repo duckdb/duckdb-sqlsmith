@@ -90,7 +90,7 @@ string FuzzyDuck::GenerateQuery(const idx_t &total_query_length) {
 	auto statement = string("");
 	if (generator.RandomPercentage(10)) {
 		// multi statement
-		idx_t number_of_statements = generator.RandomValue(100);
+		idx_t number_of_statements = generator.RandomValue(30);
 		idx_t length_multi_statement = 0;
 		string statement_i;
 		idx_t length_statement_to_add;
