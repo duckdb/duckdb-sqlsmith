@@ -20,10 +20,10 @@ void FuzzyDuck::BeginFuzzing() {
 	}
 	random_engine.SetSeed(seed);
 	if (max_queries == 0) {
-		throw BinderException("Provide a max_queries argument greater than 0");
+		throw InvalidInputException("Provide a max_queries argument greater than 0");
 	}
 	if (max_query_length == 0) {
-		throw BinderException("Provide a max_query_length argument greater than 0");
+		throw InvalidInputException("Provide a max_query_length argument greater than 0");
 	}
 	if (!complete_log.empty()) {
 		auto &fs = FileSystem::GetFileSystem(context);
