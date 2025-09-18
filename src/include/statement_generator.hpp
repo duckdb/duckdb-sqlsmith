@@ -51,7 +51,7 @@ public:
 
 	vector<string> GenerateAllFunctionCalls();
 
-	//! Returns true with a percentage change (0-100)
+	//! Returns true with a percentage chance (0-100)
 	bool RandomPercentage(idx_t percentage);
 	bool verification_enabled = false;
 	idx_t RandomValue(idx_t max);
@@ -101,7 +101,6 @@ private:
 
 	unique_ptr<OrderModifier> GenerateOrderBy();
 	unique_ptr<OrderModifier> GenerateOrderByAll();
-
 
 	LogicalType GenerateLogicalType();
 
