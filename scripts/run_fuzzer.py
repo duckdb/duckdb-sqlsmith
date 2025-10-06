@@ -104,7 +104,12 @@ def run_shell_command(cmd):
 
 
 def is_known_issue(exception_msg):
-    existing_issues = fuzzer_helper.get_github_issues_by_title(exception_msg)
+    if len(exception_msg) > 240:
+        #  avoid title is too long error (maximum is 256 characters)
+        title = exception_msg[:240] + '...'
+    else:
+        title = exception_msg
+    existing_issues = fuzzer_helper.get_github_issues_by_title(title)
     if existing_issues:
         print("Skip filing duplicate issue")
         print(
