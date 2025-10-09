@@ -73,6 +73,8 @@ def make_github_issue(title, body):
     if len(title) > 240:
         #  avoid title is too long error (maximum is 256 characters)
         title = title[:240] + '...'
+    if len(body) > 60000:
+        body = body[:60000] + '... (body of github issue is truncated)'
     session = create_session()
     url = issue_url()
     issue = {'title': title, 'body': body}
@@ -168,6 +170,10 @@ def run_shell_command_batch(shell, cmd):
 
 
 def is_reproducible_issue(shell, issue) -> bool:
+    if any(label['name'] == 'AFL' for label in issue['labels']):
+        # The reproducibility of AFL issues can not be tested, because they are formatted differently.
+        # We assume they are reproducible (i.e. not fixed yet)
+        return True
     extract = extract_issue(issue['body'], issue['number'])
     labels = issue['labels']
     label_timeout = False

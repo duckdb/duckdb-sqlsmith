@@ -20,13 +20,16 @@ void FuzzyDuck::BeginFuzzing() {
 	}
 	random_engine.SetSeed(seed);
 	if (max_queries == 0) {
-		throw BinderException("Provide a max_queries argument greater than 0");
+		throw InvalidInputException("Provide a max_queries argument greater than 0");
+	}
+	if (max_query_length == 0) {
+		throw InvalidInputException("Provide a max_query_length argument greater than 0");
 	}
 	auto &fs = FileSystem::GetFileSystem(context);
 	if (!complete_log.empty()) {
 		TryRemoveFile(complete_log);
 		complete_log_handle =
-			fs.OpenFile(complete_log, FileFlags::FILE_FLAGS_WRITE | FileFlags::FILE_FLAGS_FILE_CREATE_NEW);
+		    fs.OpenFile(complete_log, FileFlags::FILE_FLAGS_WRITE | FileFlags::FILE_FLAGS_FILE_CREATE_NEW);
 	}
 	if (enable_verification) {
 		RunQuery("PRAGMA enable_verification");
@@ -45,10 +48,18 @@ void FuzzyDuck::EndFuzzing() {
 }
 
 void FuzzyDuck::Fuzz() {
+	idx_t total_query_length = 0;
 	BeginFuzzing();
+	LogTask("Generating queries with seed " + to_string(seed));
 	for (idx_t i = 0; i < max_queries; i++) {
 		LogMessage("Query " + to_string(i) + "\n");
-		auto query = GenerateQuery();
+		auto query = GenerateQuery(total_query_length);
+		total_query_length += query.size() + 2; // add 2 for semicolon and newline
+		if (total_query_length > max_query_length) {
+			// break to prevent the query gets too large to process down-stream (e.g. should fit in issue tracker)
+			LogTask("Max query length (" + to_string(max_query_length) + ") reached");
+			break;
+		}
 		RunQuery(std::move(query));
 	}
 	EndFuzzing();
@@ -64,14 +75,21 @@ void FuzzyDuck::FuzzAllFunctions() {
 
 	std::default_random_engine e(seed);
 	std::shuffle(std::begin(queries), std::end(queries), e);
+	idx_t total_query_length = 0;
 	BeginFuzzing();
 	for (auto &query : queries) {
+		total_query_length += query.size() + 2; // add 2 for semicolon and newline
+		if (total_query_length > max_query_length) {
+			// break to prevent the query gets too large to process down-stream (e.g. should fit in issue tracker)
+			LogTask("Max query length (" + to_string(max_query_length) + ") reached");
+			break;
+		}
 		RunQuery(std::move(query));
 	}
 	EndFuzzing();
 }
 
-string FuzzyDuck::GenerateQuery() {
+string FuzzyDuck::GenerateQuery(const idx_t &total_query_length) {
 	// generate statement
 	StatementGenerator generator(context);
 	generator.verification_enabled = enable_verification;
@@ -80,15 +98,24 @@ string FuzzyDuck::GenerateQuery() {
 	auto statement = string("");
 	if (generator.RandomPercentage(10)) {
 		// multi statement
-		idx_t number_of_statements = generator.RandomValue(1000);
-		LogTask("Generating Multi-Statement query of " + to_string(number_of_statements) + " statements with seed " +
-			to_string(seed));
+		idx_t number_of_statements = generator.RandomValue(30);
+		idx_t length_multi_statement = 0;
+		string statement_i;
+		idx_t length_statement_to_add;
+		LogTask("Generating Multi-Statement query of " + to_string(number_of_statements) + " statements");
 		for (idx_t i = 0; i < number_of_statements; i++) {
-			statement += generator.GenerateStatement()->ToString() + "; ";
+			statement_i = generator.GenerateStatement()->ToString() + "; ";
+			length_statement_to_add = statement_i.size();
+			// break to prevent the query gets too large to process down-stream (e.g. should fit in issue tracker)
+			if (total_query_length + length_multi_statement + length_statement_to_add > max_query_length) {
+				break;
+			}
+			statement += statement_i;
+			length_multi_statement += length_statement_to_add;
 		}
 	} else {
 		// normal statement
-		LogTask("Generating Single-Statement query with seed " + to_string(seed));
+		LogTask("Generating Single-Statement query");
 		statement = generator.GenerateStatement()->ToString();
 	}
 	return statement;

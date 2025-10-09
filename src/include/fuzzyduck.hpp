@@ -24,6 +24,7 @@ public:
 	ClientContext &context;
 	uint32_t seed = 0;
 	idx_t max_queries = 0;
+	idx_t max_query_length = 0;
 	string complete_log;
 	string log;
 	bool verbose_output = false;
@@ -41,7 +42,7 @@ private:
 	void BeginFuzzing();
 	void EndFuzzing();
 
-	string GenerateQuery();
+	string GenerateQuery(const idx_t &total_query_length);
 	void RunQuery(string query);
 
 	void LogMessage(const string &message);

@@ -1,5 +1,3 @@
-import json
-import requests
 import sys
 import os
 import subprocess
@@ -15,6 +13,7 @@ shell = None
 perform_checks = True
 no_git_checks = False
 max_queries = 1000
+max_query_length = 50000
 verification = False
 
 for param in sys.argv:
@@ -42,6 +41,8 @@ for param in sys.argv:
         seed = int(param.replace('--seed=', ''))
     elif param.startswith('--max_queries='):
         max_queries = int(param.replace('--max_queries=', ''))
+    elif param.startswith('--max_query_length='):
+        max_query_length = int(param.replace('--max_query_length=', ''))
     elif param.startswith('--no-git-checks'):
         no_git_checks = param.replace('--no-git-checks=', '').lower() == 'true'
 
@@ -76,12 +77,12 @@ def get_create_db_statement(db):
 
 def get_fuzzer_call_statement(fuzzer):
     if fuzzer == 'sqlsmith':
-        return "call sqlsmith(max_queries=${MAX_QUERIES}, seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}');"
+        return "call sqlsmith(max_queries=${MAX_QUERIES}, max_query_length=${MAX_QUERY_LENGTH}, seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}');"
     elif fuzzer == 'duckfuzz':
         return "call fuzzyduck(max_queries=${MAX_QUERIES}, seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}', \
         enable_verification='${ENABLE_VERIFICATION}', randoms_config_filepath='${RANDOMS_CONFIG_FILEPATH}');"
     elif fuzzer == 'duckfuzz_functions':
-        return "call fuzz_all_functions(seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}');"
+        return "call fuzz_all_functions(seed=${SEED}, max_query_length=${MAX_QUERY_LENGTH}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}');"
     else:
         raise Exception("Unknown fuzzer type")
 
@@ -106,7 +107,12 @@ def run_shell_command(cmd):
 
 
 def is_known_issue(exception_msg):
-    existing_issues = fuzzer_helper.get_github_issues_by_title(exception_msg)
+    if len(exception_msg) > 240:
+        #  avoid title is too long error (maximum is 256 characters)
+        title = exception_msg[:240] + '...'
+    else:
+        title = exception_msg
+    existing_issues = fuzzer_helper.get_github_issues_by_title(title)
     if existing_issues:
         print("Skip filing duplicate issue")
         print(
@@ -141,6 +147,7 @@ create_db_statement = get_create_db_statement(db)
 call_fuzzer_statement = (
     get_fuzzer_call_statement(fuzzer)
     .replace('${MAX_QUERIES}', str(max_queries))
+    .replace('${MAX_QUERY_LENGTH}', str(max_query_length))
     .replace('${LAST_LOG_FILE}', last_query_log_file)
     .replace('${COMPLETE_LOG_FILE}', complete_log_file)
     .replace('${SEED}', str(seed))

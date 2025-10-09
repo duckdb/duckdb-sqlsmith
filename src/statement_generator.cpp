@@ -34,7 +34,7 @@ struct GeneratorContext {
 	vector<reference<CatalogEntry>> table_functions;
 	vector<reference<CatalogEntry>> pragma_functions;
 	vector<reference<CatalogEntry>> tables_and_views;
-	vector<reference<AttachedDatabase>> attached_databases;
+	vector<shared_ptr<AttachedDatabase>> attached_databases;
 };
 
 StatementGenerator::StatementGenerator(ClientContext &context) : context(context), parent(nullptr), depth(0) {
@@ -196,7 +196,7 @@ unique_ptr<DeleteStatement> StatementGenerator::GenerateDelete() {
 	} else {
 		delete_statement->table = GenerateTableRef();
 	}
-	
+
 	return delete_statement;
 }
 
@@ -216,8 +216,8 @@ unique_ptr<DetachInfo> StatementGenerator::GenerateDetachInfo() {
 
 std::string StatementGenerator::GetRandomAttachedDataBase() {
 	auto state = GetDatabaseState(context);
-	auto st_name = state->attached_databases[RandomValue(state->attached_databases.size())];
-	auto name = st_name.get().name;
+	auto &st_name = *state->attached_databases[RandomValue(state->attached_databases.size())];
+	auto name = st_name.name;
 	return name;
 }
 
@@ -773,7 +773,7 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateFunction() {
 	case CatalogType::AGGREGATE_FUNCTION_ENTRY: {
 		auto &aggregate_entry = function.Cast<AggregateFunctionCatalogEntry>();
 		auto actual_function =
-			aggregate_entry.functions.GetFunctionByOffset(RandomValue(aggregate_entry.functions.Size()));
+		    aggregate_entry.functions.GetFunctionByOffset(RandomValue(aggregate_entry.functions.Size()));
 
 		name = aggregate_entry.name;
 		min_parameters = actual_function.arguments.size();
@@ -823,26 +823,26 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateFunction() {
 }
 
 unique_ptr<OrderModifier> StatementGenerator::GenerateOrderByAll() {
-    auto result = make_uniq<OrderModifier>();
+	auto result = make_uniq<OrderModifier>();
 	auto order_type = Choose<OrderType>({OrderType::ASCENDING, OrderType::DESCENDING, OrderType::ORDER_DEFAULT});
 	auto null_type = Choose<OrderByNullType>(
-		{OrderByNullType::NULLS_FIRST, OrderByNullType::NULLS_LAST, OrderByNullType::ORDER_DEFAULT});
+	    {OrderByNullType::NULLS_FIRST, OrderByNullType::NULLS_LAST, OrderByNullType::ORDER_DEFAULT});
 	result->orders.emplace_back(order_type, null_type, GenerateStar());
-    return result;
+	return result;
 }
 
 unique_ptr<OrderModifier> StatementGenerator::GenerateOrderBy() {
-    auto result = make_uniq<OrderModifier>();
+	auto result = make_uniq<OrderModifier>();
 	while (true) {
 		auto order_type = Choose<OrderType>({OrderType::ASCENDING, OrderType::DESCENDING, OrderType::ORDER_DEFAULT});
 		auto null_type = Choose<OrderByNullType>(
-			{OrderByNullType::NULLS_FIRST, OrderByNullType::NULLS_LAST, OrderByNullType::ORDER_DEFAULT});
+		    {OrderByNullType::NULLS_FIRST, OrderByNullType::NULLS_LAST, OrderByNullType::ORDER_DEFAULT});
 		result->orders.emplace_back(order_type, null_type, GenerateExpression());
 		if (RandomPercentage(50)) {
 			break;
 		}
 	}
-    return result;
+	return result;
 }
 
 unique_ptr<ParsedExpression> StatementGenerator::GenerateOperator() {
@@ -1086,12 +1086,12 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateStar() {
 unique_ptr<ParsedExpression> StatementGenerator::GenerateLambda() {
 	// generate the lambda name and add the lambda column names to the set of possibly-generated column names
 	auto lambda_parameter = GenerateIdentifier();
-	// generate the lhs
-	auto lhs = make_uniq<ColumnRefExpression>(lambda_parameter);
+	vector<string> named_parameters;
+	named_parameters.push_back(lambda_parameter);
 	auto rhs = GenerateExpression();
 	current_column_names.erase(std::find(current_column_names.begin(), current_column_names.end(), lambda_parameter));
 
-	return make_uniq<LambdaExpression>(std::move(lhs), std::move(rhs));
+	return make_uniq<LambdaExpression>(std::move(named_parameters), std::move(rhs));
 }
 
 string StatementGenerator::GenerateDataBaseName() {
