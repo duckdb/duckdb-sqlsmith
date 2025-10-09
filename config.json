@@ -1,0 +1,8 @@
+{
+    "select_percentage": "70",
+    "attach_percentage": "20",
+    "attach_use_percentage": "80",
+    "detach_percentage": "15",
+    "set_percentage": "5",
+    "delete_percentage": "25"
+}

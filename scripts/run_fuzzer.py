@@ -33,6 +33,8 @@ for param in sys.argv:
         perform_checks = False
     elif param.startswith('--enable_verification'):
         verification = param.replace('--enable_verification=', '').lower() == 'true'
+    elif param.startswith('--randoms_config_filepath'):
+        randoms_config_filepath = param.replace('--randoms_config_filepath=', '')
     elif param.startswith('--shell='):
         shell = param.replace('--shell=', '')
     elif param.startswith('--seed='):
@@ -77,7 +79,8 @@ def get_fuzzer_call_statement(fuzzer):
     if fuzzer == 'sqlsmith':
         return "call sqlsmith(max_queries=${MAX_QUERIES}, max_query_length=${MAX_QUERY_LENGTH}, seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}');"
     elif fuzzer == 'duckfuzz':
-        return "call fuzzyduck(max_queries=${MAX_QUERIES}, max_query_length=${MAX_QUERY_LENGTH}, seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}', enable_verification='${ENABLE_VERIFICATION}');"
+        return "call fuzzyduck(max_queries=${MAX_QUERIES}, seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}', \
+        enable_verification='${ENABLE_VERIFICATION}', randoms_config_filepath='${RANDOMS_CONFIG_FILEPATH}');"
     elif fuzzer == 'duckfuzz_functions':
         return "call fuzz_all_functions(seed=${SEED}, max_query_length=${MAX_QUERY_LENGTH}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}');"
     else:
@@ -149,6 +152,7 @@ call_fuzzer_statement = (
     .replace('${COMPLETE_LOG_FILE}', complete_log_file)
     .replace('${SEED}', str(seed))
     .replace('${ENABLE_VERIFICATION}', str(verification))
+    .replace('${RANDOMS_CONFIG_FILEPATH}', randoms_config_filepath)
 )
 
 print(create_db_statement)
