@@ -186,18 +186,22 @@ with open(last_query_log_file, 'r') as f:
 with open(complete_log_file, 'r') as f:
     all_queries = f.read()
 
-(stdout, stderr, returncode) = run_shell_command(create_db_statement + '\n' + all_queries)
-
-if returncode == 0:
-    print("Failed to reproduce the issue...")
-    exit(0)
+# try max 30 times to reproduce; some errors not always occur
+cmd = create_db_statement + '\n' + all_queries
+reproducible = False
+for _ in range(30):
+    (stdout, stderr, returncode) = run_shell_command(cmd)
+    if returncode < 0 or (returncode != 0 and fuzzer_helper.is_internal_error(stderr)):
+        reproducible = True
+        break
 
 print("==============  STDOUT  ================")
 print(stdout)
 print("==============  STDERR  =================")
 print(stderr)
 print("==========================================")
-if not fuzzer_helper.is_internal_error(stderr):
+
+if not reproducible:
     print("Failed to reproduce the internal error")
     exit(0)
 
@@ -218,15 +222,19 @@ print("=========================================")
 # reduce_multi_statement checks just the last statement first as a heuristic to see if
 # only the last statement causes the error.
 required_queries = reduce_sql.reduce_multi_statement(all_queries, shell, create_db_statement)
-cmd = create_db_statement + '\n' + required_queries
+reduced_cmd = create_db_statement + '\n' + required_queries
 
 # get a new error message.
-(stdout, stderr, returncode) = run_shell_command(cmd)
-exception_msg, stacktrace = fuzzer_helper.split_exception_trace(stderr)
+(stdout, stderr, returncode) = run_shell_command(reduced_cmd)
+reduced_exception_msg, stacktrace = fuzzer_helper.split_exception_trace(stderr)
 
 # check if this is a duplicate issue
-if (not no_git_checks) and is_known_issue(exception_msg):
+if (not no_git_checks) and is_known_issue(reduced_exception_msg):
     exit(0)
+
+if returncode < 0 or (returncode != 0 and fuzzer_helper.is_internal_error(stderr)):
+    exception_msg = reduced_exception_msg
+    cmd = reduced_cmd
 
 print(f"================MARKER====================")
 print(f"After reducing: the below sql causes an internal error \n `{cmd}`")
