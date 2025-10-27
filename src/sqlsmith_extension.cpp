@@ -199,7 +199,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 	fuzzy_duck_fun.named_parameters["verbose_output"] = LogicalType::BOOLEAN;
 	fuzzy_duck_fun.named_parameters["enable_verification"] = LogicalType::BOOLEAN;
 	fuzzy_duck_fun.named_parameters["randoms_config_filepath"] = LogicalType::VARCHAR;
-	ExtensionUtil::RegisterFunction(db_instance, fuzzy_duck_fun);
+	loader.RegisterFunction(fuzzy_duck_fun);
 
 	TableFunction fuzz_all_functions("fuzz_all_functions", {}, FuzzAllFunctions, FuzzyDuckBind);
 	fuzz_all_functions.named_parameters["seed"] = LogicalType::INTEGER;

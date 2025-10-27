@@ -692,7 +692,7 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateExpression() {
 }
 
 Value StatementGenerator::GenerateConstantValue() {
-	if (RandomPercentage(config[RandomPercentagesEnum::CONSTANT_VALUE_BIGINT)) {
+	if (RandomPercentage(config[RandomPercentagesEnum::CONSTANT_VALUE_BIGINT])) {
 		return Value::BIGINT(RandomValue(9999));
 	}
 	if (RandomPercentage(config[RandomPercentagesEnum::CONSTANT_VALUE_TO_STRING])) {
