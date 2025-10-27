@@ -137,7 +137,6 @@ public:
     ~RandomNumsConfig();
 
     RandomPercentagesEnum percentages_selector;
-    // unordered_map<RandomPercentagesEnum, idx_t> config;
     
     unordered_map<RandomPercentagesEnum, idx_t> GetDefaultConfig();
     unordered_map<RandomPercentagesEnum, idx_t> GetConfigFromFile(const char *json_string);
