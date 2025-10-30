@@ -21,6 +21,7 @@
 #include "duckdb/parser/statement/detach_statement.hpp"
 #include "duckdb/parser/statement/insert_statement.hpp"
 #include "duckdb/parser/statement/multi_statement.hpp"
+#include "duckdb/parser/statement/pragma_statement.hpp"
 #include "duckdb/parser/statement/select_statement.hpp"
 #include "duckdb/parser/statement/set_statement.hpp"
 #include "duckdb/parser/statement/update_statement.hpp"
@@ -106,6 +107,9 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement() {
 	if (RandomPercentage(60)) {
 		return GenerateStatement(StatementType::DETACH_STATEMENT);
 	}
+	if (RandomPercentage(50)) {
+		return GenerateStatement(StatementType::PRAGMA_STATEMENT);
+	} 
 	if (RandomPercentage(30)) {
 		return GenerateStatement(StatementType::SET_STATEMENT);
 	}
@@ -130,6 +134,8 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement(StatementType typ
 		return GenerateSet();
 	case StatementType::DELETE_STATEMENT:
 		return GenerateDelete();
+	case StatementType::PRAGMA_STATEMENT:
+		return GeneratePragma();
 	default:
 		throw InternalException("Unsupported type");
 	}
@@ -198,6 +204,26 @@ unique_ptr<DeleteStatement> StatementGenerator::GenerateDelete() {
 	}
 
 	return delete_statement;
+}
+
+//===--------------------------------------------------------------------===//
+// Generate Pragma
+//===--------------------------------------------------------------------===//
+
+unique_ptr<PragmaStatement> StatementGenerator::GeneratePragma() {
+	auto pragma_stmt = make_uniq<PragmaStatement>();
+	pragma_stmt->info = make_uniq<PragmaInfo>();
+	// getting a random pragma_function
+	if (!generator_context->pragma_functions.empty()) {
+		auto &entry = Choose(generator_context->pragma_functions).get();
+		pragma_stmt->info->name = entry.name;
+	} else {
+		pragma_stmt->info->name = "enable_progress_bar";
+	}
+	if (RandomPercentage(50)) {
+		pragma_stmt->info->parameters.push_back(GenerateConstant());
+	}
+	return pragma_stmt;
 }
 
 //===--------------------------------------------------------------------===//

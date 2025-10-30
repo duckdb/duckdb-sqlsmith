@@ -98,6 +98,7 @@ private:
 	unique_ptr<ParsedExpression> GenerateComparison();
 	unique_ptr<ParsedExpression> GeneratePositionalReference();
 	unique_ptr<ParsedExpression> GenerateCase();
+	unique_ptr<PragmaStatement> GeneratePragma();
 
 	unique_ptr<OrderModifier> GenerateOrderBy();
 	unique_ptr<OrderModifier> GenerateOrderByAll();
