@@ -17,6 +17,8 @@
 #include "duckdb/parser/query_node/set_operation_node.hpp"
 #include "duckdb/parser/statement/attach_statement.hpp"
 #include "duckdb/parser/statement/create_statement.hpp"
+#include "duckdb/parser/statement/copy_statement.hpp"
+#include "duckdb/parser/statement/copy_database_statement.hpp"
 #include "duckdb/parser/statement/delete_statement.hpp"
 #include "duckdb/parser/statement/detach_statement.hpp"
 #include "duckdb/parser/statement/insert_statement.hpp"
@@ -117,7 +119,7 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement() {
 		return GenerateStatement(StatementType::DELETE_STATEMENT);
 	}
 	if (RandomPercentage(10)) {
-		return GenerateStatement(StatementType::COPY_DATABASE_STATEMENT);
+		return GenerateCopyDatabase();
 	}
 	return GenerateStatement(StatementType::CREATE_STATEMENT);
 }
@@ -139,8 +141,8 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement(StatementType typ
 		return GenerateDelete();
 	case StatementType::PRAGMA_STATEMENT:
 		return GeneratePragma();
-	case StatementType::COPY_STATEMENT:
-		return GenerateCopy();
+	case StatementType::COPY_DATABASE_STATEMENT:
+		return GenerateCopyDatabase();
 	default:
 		throw InternalException("Unsupported type");
 	}
@@ -232,17 +234,14 @@ unique_ptr<PragmaStatement> StatementGenerator::GeneratePragma() {
 }
 
 //===--------------------------------------------------------------------===//
-// Copy Statement
+// Copy Database Statement
 //===--------------------------------------------------------------------===//
 
 unique_ptr<CopyDatabaseStatement> StatementGenerator::GenerateCopyDatabase() {
-	auto copy_stmt = make_uniq<CopyDatabaseStatement>();
-	copy_stmt->info = make_uniq<CopyDatabaseInfo>();
-	// Choose from existing dbs and a new path
-	copy_stmt->info->source = GetRandomAttachedDataBase();
-	copy_stmt->info->target = "db_" + RandomString(6);
-	copy_stmt->info->directory = TESTING_DIRECTORY_NAME;
-	return copy_stmt;
+    auto from_db = GetRandomAttachedDataBase();
+    auto to_db = string("db_") + RandomString(6);
+    auto mode = RandomPercentage(50) ? CopyDatabaseType::COPY_SCHEMA : CopyDatabaseType::COPY_DATA;
+    return make_uniq<CopyDatabaseStatement>(std::move(from_db), std::move(to_db), mode);
 }
 
 //===--------------------------------------------------------------------===//
