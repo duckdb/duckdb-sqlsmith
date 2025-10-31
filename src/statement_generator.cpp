@@ -116,6 +116,9 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement() {
 	if (RandomPercentage(40)) { // 20
 		return GenerateStatement(StatementType::DELETE_STATEMENT);
 	}
+	if (RandomPercentage(10)) {
+		return GenerateStatement(StatementType::COPY_DATABASE_STATEMENT);
+	}
 	return GenerateStatement(StatementType::CREATE_STATEMENT);
 }
 
@@ -136,6 +139,8 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement(StatementType typ
 		return GenerateDelete();
 	case StatementType::PRAGMA_STATEMENT:
 		return GeneratePragma();
+	case StatementType::COPY_STATEMENT:
+		return GenerateCopy();
 	default:
 		throw InternalException("Unsupported type");
 	}
@@ -224,6 +229,20 @@ unique_ptr<PragmaStatement> StatementGenerator::GeneratePragma() {
 		pragma_stmt->info->parameters.push_back(GenerateConstant());
 	}
 	return pragma_stmt;
+}
+
+//===--------------------------------------------------------------------===//
+// Copy Statement
+//===--------------------------------------------------------------------===//
+
+unique_ptr<CopyDatabaseStatement> StatementGenerator::GenerateCopyDatabase() {
+	auto copy_stmt = make_uniq<CopyDatabaseStatement>();
+	copy_stmt->info = make_uniq<CopyDatabaseInfo>();
+	// Choose from existing dbs and a new path
+	copy_stmt->info->source = GetRandomAttachedDataBase();
+	copy_stmt->info->target = "db_" + RandomString(6);
+	copy_stmt->info->directory = TESTING_DIRECTORY_NAME;
+	return copy_stmt;
 }
 
 //===--------------------------------------------------------------------===//
