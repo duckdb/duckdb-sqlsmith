@@ -255,10 +255,22 @@ unique_ptr<CopyDatabaseStatement> StatementGenerator::GenerateCopyDatabase() {
 //===--------------------------------------------------------------------===//
 
 unique_ptr<ExplainStatement> StatementGenerator::GenerateExplain() {
-	auto stmt = make_uniq<ExplainStatement>();
-	stmt->stmt = GenerateStatement(); 
-	// TODO: stmt->explain_type / analyze etc
-	return stmt;
+	unique_ptr<SQLStatement> payload;
+    if (RandomPercentage(70)) {
+        payload = GenerateStatement(StatementType::SELECT_STATEMENT);
+    } else {
+        payload = GenerateStatement(Choose<StatementType>({
+            StatementType::DELETE_STATEMENT,
+            StatementType::UPDATE_STATEMENT,
+            StatementType::CREATE_STATEMENT
+        }));
+    }
+    auto stmt = make_uniq<ExplainStatement>(
+        std::move(payload),
+        ExplainType::EXPLAIN_STANDARD,
+        ExplainFormat::DEFAULT
+    );
+    return stmt;
 }
 
 //===--------------------------------------------------------------------===//
