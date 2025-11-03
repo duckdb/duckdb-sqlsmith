@@ -100,6 +100,7 @@ private:
 	unique_ptr<ParsedExpression> GenerateCase();
 	unique_ptr<PragmaStatement> GeneratePragma();
 	unique_ptr<CopyDatabaseStatement> GenerateCopyDatabase();
+	unique_ptr<ExplainStatement> GenerateExplain();
 
 	unique_ptr<OrderModifier> GenerateOrderBy();
 	unique_ptr<OrderModifier> GenerateOrderByAll();

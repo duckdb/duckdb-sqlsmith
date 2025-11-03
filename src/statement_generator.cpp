@@ -13,6 +13,7 @@
 #include "duckdb/parser/parsed_data/create_type_info.hpp"
 #include "duckdb/parser/parsed_data/create_view_info.hpp"
 #include "duckdb/parser/parsed_expression_iterator.hpp"
+#include "duckdb/parser/statement/explain_statement.hpp"
 #include "duckdb/parser/query_node/select_node.hpp"
 #include "duckdb/parser/query_node/set_operation_node.hpp"
 #include "duckdb/parser/statement/attach_statement.hpp"
@@ -121,6 +122,9 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement() {
 	if (RandomPercentage(10)) {
 		return GenerateCopyDatabase();
 	}
+	if (RandomPercentage(20)) {
+		return GenerateStatement(StatementType::EXPLAIN_STATEMENT);
+	}
 	return GenerateStatement(StatementType::CREATE_STATEMENT);
 }
 
@@ -143,6 +147,8 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement(StatementType typ
 		return GeneratePragma();
 	case StatementType::COPY_DATABASE_STATEMENT:
 		return GenerateCopyDatabase();
+	case StatementType::EXPLAIN_STATEMENT:
+		return GenerateExplain();
 	default:
 		throw InternalException("Unsupported type");
 	}
@@ -242,6 +248,17 @@ unique_ptr<CopyDatabaseStatement> StatementGenerator::GenerateCopyDatabase() {
     auto to_db = string("db_") + RandomString(6);
     auto mode = RandomPercentage(50) ? CopyDatabaseType::COPY_SCHEMA : CopyDatabaseType::COPY_DATA;
     return make_uniq<CopyDatabaseStatement>(std::move(from_db), std::move(to_db), mode);
+}
+
+//===--------------------------------------------------------------------===//
+// Explain Statement
+//===--------------------------------------------------------------------===//
+
+unique_ptr<ExplainStatement> StatementGenerator::GenerateExplain() {
+	auto stmt = make_uniq<ExplainStatement>();
+	stmt->stmt = GenerateStatement(); 
+	// TODO: stmt->explain_type / analyze etc
+	return stmt;
 }
 
 //===--------------------------------------------------------------------===//
