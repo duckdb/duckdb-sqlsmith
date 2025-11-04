@@ -165,16 +165,17 @@ print(
         FINISHED RUNNING
 =========================================='''
 )
-print("==============  STDOUT  ================")
-print(stdout)
-print("==============  STDERR  =================")
-print(stderr)
-print("==========================================")
 
 print(returncode)
 if returncode == 0:
     print("==============  SUCCESS  ================")
     exit(0)
+else:
+    print("==============  STDOUT  ================")
+    print(stdout)
+    print("==============  STDERR  =================")
+    print(stderr)
+    print("==========================================")
 
 print("==============  FAILURE  ================")
 print("Attempting to reproduce and file issue...")
