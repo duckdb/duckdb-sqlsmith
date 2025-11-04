@@ -1,6 +1,7 @@
 import subprocess
 import time
 import os
+import re
 import fuzzer_helper
 import multiprocessing
 import sqlite3
@@ -51,6 +52,7 @@ def run_shell_command(shell, cmd):
     return (stdout, stderr, res.returncode)
 
 
+# reduce a single statement
 def get_reduced_sql(shell, sql_query):
     reduce_query = get_reduced_query.replace('${QUERY}', sql_query.replace("'", "''"))
     (stdout, stderr, returncode) = run_shell_command(shell, reduce_query)
@@ -70,6 +72,7 @@ def get_reduced_sql(shell, sql_query):
     return reduce_candidates[1:]
 
 
+# reduce a single statement
 def reduce(sql_query, data_load, shell, error_msg, max_time_seconds=300):
     start = time.time()
     while True:
@@ -218,16 +221,14 @@ def reduce_multi_statement(sql_queries, local_shell, local_data_load, max_time=3
     reducer = MultiStatementManager(sql_queries)
     last_statement = reducer.get_last_statement()
     print(f"testing if just last statement of multi statement creates the error")
+    print(f"last statement is: {last_statement}")
     (stdout, stderr, returncode) = run_shell_command(local_shell, local_data_load + last_statement)
-    expected_error, _ = fuzzer_helper.split_exception_trace(stderr)
-    if len(expected_error) > 0:
-        print(f"Expected error is {expected_error}")
-    else:
-        print(f"last statement {last_statement} produces no error")
-    if fuzzer_helper.is_internal_error(stderr) and len(expected_error) > 0:
+    if returncode < 0 or fuzzer_helper.is_internal_error(stderr):
         # reduce just the last statement
-        print(f"last statement produces error")
+        expected_error, _ = fuzzer_helper.split_exception_trace(stderr)
+        print(f"last statement produces error: {expected_error}")
         return reduce(last_statement, local_data_load, local_shell, expected_error, max_time)
+    # reduce all statements
     queries = reduce_query_log(reducer.statements, local_shell, [local_data_load])
     return "\n".join(queries)
 

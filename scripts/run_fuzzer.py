@@ -166,11 +166,11 @@ print(
 =========================================='''
 )
 
-print(returncode)
 if returncode == 0:
-    print("==============  SUCCESS  ================")
+    print(f"returncode: {returncode} ; no errors found")
     exit(0)
 else:
+    print(returncode)
     print("==============  CMD  ================")
     print(cmd)
     print("==============  STDOUT  ================")
