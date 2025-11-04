@@ -29,6 +29,8 @@
 #include "duckdb/parser/statement/set_statement.hpp"
 #include "duckdb/parser/statement/update_statement.hpp"
 #include "duckdb/parser/tableref/list.hpp"
+#include "duckdb/parser/statement/transaction_statement.hpp"
+#include "duckdb/parser/parsed_data/transaction_info.hpp"
 
 namespace duckdb {
 
@@ -125,6 +127,9 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement() {
 	if (RandomPercentage(20)) {
 		return GenerateStatement(StatementType::EXPLAIN_STATEMENT);
 	}
+		if (RandomPercentage(20)) {
+		return GenerateStatement(StatementType::TRANSACTION_STATEMENT);
+	}
 	return GenerateStatement(StatementType::CREATE_STATEMENT);
 }
 
@@ -149,6 +154,8 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement(StatementType typ
 		return GenerateCopyDatabase();
 	case StatementType::EXPLAIN_STATEMENT:
 		return GenerateExplain();
+	case StatementType::TRANSACTION_STATEMENT:
+    	return GenerateTransaction();
 	default:
 		throw InternalException("Unsupported type");
 	}
@@ -248,6 +255,20 @@ unique_ptr<CopyDatabaseStatement> StatementGenerator::GenerateCopyDatabase() {
     auto to_db = string("db_") + RandomString(6);
     auto mode = RandomPercentage(50) ? CopyDatabaseType::COPY_SCHEMA : CopyDatabaseType::COPY_DATA;
     return make_uniq<CopyDatabaseStatement>(std::move(from_db), std::move(to_db), mode);
+}
+
+//===--------------------------------------------------------------------===//
+// Transaction Statement
+//===--------------------------------------------------------------------===//
+
+unique_ptr<TransactionStatement> StatementGenerator::GenerateTransaction() {
+    auto t = Choose<TransactionType>({
+        TransactionType::BEGIN_TRANSACTION,
+        TransactionType::COMMIT,
+        TransactionType::ROLLBACK
+    });
+	auto info = make_uniq<TransactionInfo>(t);
+    return make_uniq<TransactionStatement>(std::move(info));
 }
 
 //===--------------------------------------------------------------------===//
