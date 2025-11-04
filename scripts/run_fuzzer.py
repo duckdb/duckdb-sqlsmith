@@ -171,6 +171,8 @@ if returncode == 0:
     print("==============  SUCCESS  ================")
     exit(0)
 else:
+    print("==============  CMD  ================")
+    print(cmd)
     print("==============  STDOUT  ================")
     print(stdout)
     print("==============  STDERR  =================")
