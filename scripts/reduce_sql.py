@@ -137,7 +137,7 @@ def run_queries_until_crash_mp(local_shell, data_load, queries, result_file):
 
         is_internal_error = fuzzer_helper.is_internal_error(stderr)
         exception_error, _ = fuzzer_helper.split_exception_trace(stderr)
-        if is_internal_error and len(expected_error) > 0:
+        if is_internal_error and len(exception_error) > 0:
             keep_query = True
             sqlite_con.execute('UPDATE result SET text=?', (exception_error,))
         if not keep_query:
