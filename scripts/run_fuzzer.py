@@ -187,6 +187,10 @@ with open(last_query_log_file, 'r') as f:
 with open(complete_log_file, 'r') as f:
     all_queries = f.read()
 
+print("==============  All Queries  =================")
+print(all_queries)
+print("==========================================")
+
 # try max 30 times to reproduce; some errors not always occur
 cmd = create_db_statement + '\n' + all_queries
 reproducible = False
