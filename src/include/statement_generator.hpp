@@ -102,6 +102,8 @@ private:
 	unique_ptr<CopyDatabaseStatement> GenerateCopyDatabase();
 	unique_ptr<ExplainStatement> GenerateExplain();
 	unique_ptr<TransactionStatement> GenerateTransaction();
+	unique_ptr<DropStatement> GenerateDrop();
+	unique_ptr<PrepareStatement> GeneratePrepare();
 
 	unique_ptr<OrderModifier> GenerateOrderBy();
 	unique_ptr<OrderModifier> GenerateOrderByAll();

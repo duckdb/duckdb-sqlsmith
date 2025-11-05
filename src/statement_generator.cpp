@@ -31,6 +31,10 @@
 #include "duckdb/parser/tableref/list.hpp"
 #include "duckdb/parser/statement/transaction_statement.hpp"
 #include "duckdb/parser/parsed_data/transaction_info.hpp"
+#include "duckdb/parser/statement/drop_statement.hpp"
+#include "duckdb/parser/parsed_data/drop_info.hpp"
+#include "duckdb/parser/statement/prepare_statement.hpp"
+
 
 namespace duckdb {
 
@@ -130,6 +134,9 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement() {
 		if (RandomPercentage(20)) {
 		return GenerateStatement(StatementType::TRANSACTION_STATEMENT);
 	}
+	if (RandomPercentage(20)) {
+		return GenerateDrop();
+	}
 	return GenerateStatement(StatementType::CREATE_STATEMENT);
 }
 
@@ -156,6 +163,8 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement(StatementType typ
 		return GenerateExplain();
 	case StatementType::TRANSACTION_STATEMENT:
     	return GenerateTransaction();
+	case StatementType::DROP_STATEMENT:
+    	return GenerateDrop();
 	default:
 		throw InternalException("Unsupported type");
 	}
@@ -291,6 +300,44 @@ unique_ptr<ExplainStatement> StatementGenerator::GenerateExplain() {
         ExplainType::EXPLAIN_STANDARD,
         ExplainFormat::DEFAULT
     );
+    return stmt;
+}
+
+//===--------------------------------------------------------------------===//
+// Drop Statement
+//===--------------------------------------------------------------------===//
+
+unique_ptr<DropStatement> StatementGenerator::GenerateDrop() {
+	auto info = make_uniq<DropInfo>();
+
+	info->type = Choose<CatalogType>({
+		CatalogType::TABLE_ENTRY,
+		CatalogType::VIEW_ENTRY,
+		CatalogType::SCHEMA_ENTRY,
+		CatalogType::SEQUENCE_ENTRY
+	});
+
+	info->schema = DEFAULT_SCHEMA;
+	if (!generator_context->tables_and_views.empty() &&
+		(info->type == CatalogType::TABLE_ENTRY || info->type == CatalogType::VIEW_ENTRY)) {
+		auto &entry = Choose(generator_context->tables_and_views).get();
+		info->name = entry.name;
+	} else {
+		info->name = GenerateIdentifier();
+	}
+	auto stmt = make_uniq<DropStatement>();
+	stmt->info = std::move(info);
+	return stmt;
+}
+
+//===--------------------------------------------------------------------===//
+// Prepare Statement
+//===--------------------------------------------------------------------===//
+
+unique_ptr<PrepareStatement> StatementGenerator::GeneratePrepare() {
+    auto stmt = make_uniq<PrepareStatement>();
+    stmt->name = string("prep_") + RandomString(6);
+    stmt->statement = unique_ptr_cast<SQLStatement, SelectStatement>(GenerateSelect());
     return stmt;
 }
 
