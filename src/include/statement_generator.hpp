@@ -104,6 +104,7 @@ private:
 	unique_ptr<TransactionStatement> GenerateTransaction();
 	unique_ptr<DropStatement> GenerateDrop();
 	unique_ptr<PrepareStatement> GeneratePrepare();
+	unique_ptr<ExportStatement> GenerateExport();
 
 	unique_ptr<OrderModifier> GenerateOrderBy();
 	unique_ptr<OrderModifier> GenerateOrderByAll();

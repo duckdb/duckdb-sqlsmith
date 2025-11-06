@@ -34,7 +34,8 @@
 #include "duckdb/parser/statement/drop_statement.hpp"
 #include "duckdb/parser/parsed_data/drop_info.hpp"
 #include "duckdb/parser/statement/prepare_statement.hpp"
-
+#include "duckdb/parser/statement/export_statement.hpp"
+#include "duckdb/parser/parsed_data/copy_info.hpp"
 
 namespace duckdb {
 
@@ -137,6 +138,9 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement() {
 	if (RandomPercentage(20)) {
 		return GenerateDrop();
 	}
+	if (RandomPercentage(20)) {
+		return GenerateExport();
+	}
 	return GenerateStatement(StatementType::CREATE_STATEMENT);
 }
 
@@ -162,9 +166,11 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement(StatementType typ
 	case StatementType::EXPLAIN_STATEMENT:
 		return GenerateExplain();
 	case StatementType::TRANSACTION_STATEMENT:
-    	return GenerateTransaction();
+		return GenerateTransaction();
 	case StatementType::DROP_STATEMENT:
-    	return GenerateDrop();
+		return GenerateDrop();
+	case StatementType::EXPORT_STATEMENT:
+		return GenerateDrop();
 	default:
 		throw InternalException("Unsupported type");
 	}
@@ -340,6 +346,22 @@ unique_ptr<PrepareStatement> StatementGenerator::GeneratePrepare() {
     stmt->statement = unique_ptr_cast<SQLStatement, SelectStatement>(GenerateSelect());
     return stmt;
 }
+
+//===--------------------------------------------------------------------===//
+// Export Statement
+//===--------------------------------------------------------------------===//
+
+unique_ptr<ExportStatement> StatementGenerator::GenerateExport() {
+	auto info = make_uniq<CopyInfo>();
+	auto stmt = make_uniq<ExportStatement>(std::move(info));
+	if (!generator_context->attached_databases.empty()) {
+		stmt->database = GetRandomAttachedDataBase();
+	} else {
+		stmt->database = string();
+	}
+	return stmt;
+}
+
 
 //===--------------------------------------------------------------------===//
 // Generate Detach Info
