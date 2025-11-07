@@ -36,6 +36,7 @@
 #include "duckdb/parser/statement/prepare_statement.hpp"
 #include "duckdb/parser/statement/export_statement.hpp"
 #include "duckdb/parser/parsed_data/copy_info.hpp"
+#include "duckdb/parser/statement/insert_statement.hpp"
 
 namespace duckdb {
 
@@ -362,6 +363,25 @@ unique_ptr<ExportStatement> StatementGenerator::GenerateExport() {
 	return stmt;
 }
 
+//===--------------------------------------------------------------------===//
+// Export Statement
+//===--------------------------------------------------------------------===//
+
+unique_ptr<InsertStatement> StatementGenerator::GenerateInsert() {
+    auto stmt = make_uniq<InsertStatement>();
+	// firts try to insert to real table
+    if (!generator_context->tables_and_views.empty()) {
+        auto &entry = Choose(generator_context->tables_and_views).get();
+        if (entry.type == CatalogType::TABLE_ENTRY) {
+            stmt->table = entry.name;
+            stmt->select_statement = GenerateSelect();
+            return stmt;
+        }
+    }
+    stmt->table = GenerateTableIdentifier();
+    stmt->select_statement = GenerateSelect();
+    return stmt;
+}
 
 //===--------------------------------------------------------------------===//
 // Generate Detach Info
