@@ -106,6 +106,7 @@ private:
 	unique_ptr<PrepareStatement> GeneratePrepare();
 	unique_ptr<ExportStatement> GenerateExport();
 	unique_ptr<InsertStatement> GenerateInsert();
+	unique_ptr<VacuumStatement> GenerateVacuum();
 
 	unique_ptr<OrderModifier> GenerateOrderBy();
 	unique_ptr<OrderModifier> GenerateOrderByAll();

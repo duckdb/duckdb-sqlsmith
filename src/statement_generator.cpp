@@ -37,6 +37,7 @@
 #include "duckdb/parser/statement/export_statement.hpp"
 #include "duckdb/parser/parsed_data/copy_info.hpp"
 #include "duckdb/parser/statement/insert_statement.hpp"
+#include "duckdb/parser/statement/vacuum_statement.hpp"
 
 namespace duckdb {
 
@@ -145,6 +146,9 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement() {
 	if (RandomPercentage(20)) {
 		return GenerateInsert();
 	}
+	if (RandomPercentage(20)) {
+		return GenerateVacuum();
+	}
 	return GenerateStatement(StatementType::CREATE_STATEMENT);
 }
 
@@ -177,6 +181,8 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement(StatementType typ
 		return GenerateExport();
 	case StatementType::INSERT_STATEMENT:
 		return GenerateInsert();
+	case StatementType::VACUUM_STATEMENT:
+		return GenerateVacuum();
 	default:
 		throw InternalException("Unsupported type");
 	}
@@ -386,6 +392,15 @@ unique_ptr<InsertStatement> StatementGenerator::GenerateInsert() {
     stmt->table = GenerateTableIdentifier();
     stmt->select_statement = GenerateSelect();
     return stmt;
+}
+
+//===--------------------------------------------------------------------===//
+// Vacuum Statement
+//===--------------------------------------------------------------------===//
+
+unique_ptr<VacuumStatement> StatementGenerator::GenerateVacuum() {
+	duckdb::VacuumOptions opts;
+    return make_uniq<VacuumStatement>(opts);
 }
 
 //===--------------------------------------------------------------------===//
