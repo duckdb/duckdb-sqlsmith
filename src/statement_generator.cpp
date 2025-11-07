@@ -142,6 +142,9 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement() {
 	if (RandomPercentage(20)) {
 		return GenerateExport();
 	}
+	if (RandomPercentage(20)) {
+		return GenerateInsert();
+	}
 	return GenerateStatement(StatementType::CREATE_STATEMENT);
 }
 
@@ -171,7 +174,9 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement(StatementType typ
 	case StatementType::DROP_STATEMENT:
 		return GenerateDrop();
 	case StatementType::EXPORT_STATEMENT:
-		return GenerateDrop();
+		return GenerateExport();
+	case StatementType::INSERT_STATEMENT:
+		return GenerateInsert();
 	default:
 		throw InternalException("Unsupported type");
 	}
@@ -364,7 +369,7 @@ unique_ptr<ExportStatement> StatementGenerator::GenerateExport() {
 }
 
 //===--------------------------------------------------------------------===//
-// Export Statement
+// Insert Statement
 //===--------------------------------------------------------------------===//
 
 unique_ptr<InsertStatement> StatementGenerator::GenerateInsert() {
