@@ -221,7 +221,7 @@ def reduce_multi_statement(sql_queries, local_shell, local_data_load, max_time=3
     reducer = MultiStatementManager(sql_queries)
     last_statement = reducer.get_last_statement()
     print(f"testing if just last statement of multi statement creates the error")
-    print(f"last statement is: {last_statement}")
+    print(f"last statement is: {last_statement if len(last_statement) < 500 else last_statement[:500] + " (truncated)"}")
     (stdout, stderr, returncode) = run_shell_command(local_shell, local_data_load + last_statement)
     if returncode < 0 or fuzzer_helper.is_internal_error(stderr):
         # reduce just the last statement

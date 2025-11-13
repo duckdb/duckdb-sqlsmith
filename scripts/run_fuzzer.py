@@ -170,7 +170,7 @@ if returncode == 0:
     print(f"returncode: {returncode} ; no errors found")
     exit(0)
 else:
-    print(returncode)
+    print(f"returncode: {returncode}")
     print("==============  CMD  ================")
     print(cmd)
     print("==============  STDOUT  ================")
