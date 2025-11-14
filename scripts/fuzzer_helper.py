@@ -11,6 +11,15 @@ USERNAME = 'fuzzerofducks'
 REPO_OWNER = 'duckdb'
 REPO_NAME = 'duckdb-fuzzer'
 
+INTERNAL_ERROR_STRINGS = [
+    "differs from original result",
+    "internal",
+    "signed integer overflow",
+    "sanitizer",
+    "runtime error",
+    "abort",
+]
+
 fuzzer_desc = '''Issue found by ${FUZZER} on git commit hash [${SHORT_HASH}](https://github.com/duckdb/duckdb/commit/${FULL_HASH}) using seed ${SEED}.
 '''
 
@@ -231,18 +240,16 @@ def file_issue(cmd, exception_msg, stacktrace, fuzzer, seed, hash):
     make_github_issue(title, body)
 
 
-def is_internal_error(error):
-    if 'differs from original result' in error:
-        return True
-    if 'INTERNAL' in error:
-        return True
-    if 'signed integer overflow' in error:
-        return True
-    if 'Sanitizer' in error or 'sanitizer' in error:
-        return True
-    if 'runtime error' in error:
-        return True
-    return False
+def is_internal_error(error_str: str):
+    return any(internal_error in error_str.lower() for internal_error in INTERNAL_ERROR_STRINGS)
+
+
+def get_internal_exception_msg(error_str: str):
+    pattern = rf"^.*?(?:{"|".join(INTERNAL_ERROR_STRINGS)}).*?$"
+    exception_match = re.search(pattern, error_str, flags=(re.MULTILINE | re.IGNORECASE))
+    exception_msg = exception_match.group()
+    _, _, trace = error_str.partition(exception_msg)
+    return (exception_msg, trace)
 
 
 def sanitize_stacktrace(err):
@@ -252,7 +259,22 @@ def sanitize_stacktrace(err):
     return err.strip()
 
 
+def sanitize_error(err):
+    err = re.sub(r'Error: near line \d+: ', '', err)
+    err = err.replace(os.getcwd() + '/', '')
+    err = err.replace(os.getcwd(), '')
+    err = re.sub(r'LINE \d+:.*\n', '', err)
+    err = re.sub(r' *\^ *', '', err)
+    if 'AddressSanitizer' in err:
+        match = re.search(r'[ \t]+[#]0 ([A-Za-z0-9]+) ([^\n]+)', err).groups()[1]
+        err = 'AddressSanitizer error ' + match
+    return err.strip()
+
+
 def split_exception_trace(exception_msg_full: str) -> tuple[str, str]:
-    # exception message does not contain newline, so split after first newline
-    exception_msg, _, stack_trace = exception_msg_full.partition('\n')
-    return (exception_msg.strip(), sanitize_stacktrace(stack_trace))
+    if is_internal_error(exception_msg_full):
+        exception_msg, stack_trace = get_internal_exception_msg(exception_msg_full)
+    else:
+        # exception message does not contain newline, so split after first newline
+        exception_msg, _, stack_trace = exception_msg_full.partition('\n')
+    return (sanitize_error(exception_msg), sanitize_stacktrace(stack_trace))

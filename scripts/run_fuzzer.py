@@ -165,16 +165,19 @@ print(
         FINISHED RUNNING
 =========================================='''
 )
-print("==============  STDOUT  ================")
-print(stdout)
-print("==============  STDERR  =================")
-print(stderr)
-print("==========================================")
 
-print(returncode)
 if returncode == 0:
-    print("==============  SUCCESS  ================")
+    print(f"returncode: {returncode} ; no errors found")
     exit(0)
+else:
+    print(f"returncode: {returncode}")
+    print("==============  CMD  ================")
+    print(cmd)
+    print("==============  STDOUT  ================")
+    print(stdout)
+    print("==============  STDERR  =================")
+    print(stderr)
+    print("==========================================")
 
 print("==============  FAILURE  ================")
 print("Attempting to reproduce and file issue...")
@@ -185,6 +188,10 @@ with open(last_query_log_file, 'r') as f:
 
 with open(complete_log_file, 'r') as f:
     all_queries = f.read()
+
+print("==============  All Queries  =================")
+print(all_queries)
+print("==========================================")
 
 # try max 30 times to reproduce; some errors not always occur
 cmd = create_db_statement + '\n' + all_queries
