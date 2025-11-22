@@ -13,18 +13,31 @@
 #include "duckdb/parser/parsed_data/create_type_info.hpp"
 #include "duckdb/parser/parsed_data/create_view_info.hpp"
 #include "duckdb/parser/parsed_expression_iterator.hpp"
+#include "duckdb/parser/statement/explain_statement.hpp"
 #include "duckdb/parser/query_node/select_node.hpp"
 #include "duckdb/parser/query_node/set_operation_node.hpp"
 #include "duckdb/parser/statement/attach_statement.hpp"
 #include "duckdb/parser/statement/create_statement.hpp"
+#include "duckdb/parser/statement/copy_statement.hpp"
+#include "duckdb/parser/statement/copy_database_statement.hpp"
 #include "duckdb/parser/statement/delete_statement.hpp"
 #include "duckdb/parser/statement/detach_statement.hpp"
 #include "duckdb/parser/statement/insert_statement.hpp"
 #include "duckdb/parser/statement/multi_statement.hpp"
+#include "duckdb/parser/statement/pragma_statement.hpp"
 #include "duckdb/parser/statement/select_statement.hpp"
 #include "duckdb/parser/statement/set_statement.hpp"
 #include "duckdb/parser/statement/update_statement.hpp"
 #include "duckdb/parser/tableref/list.hpp"
+#include "duckdb/parser/statement/transaction_statement.hpp"
+#include "duckdb/parser/parsed_data/transaction_info.hpp"
+#include "duckdb/parser/statement/drop_statement.hpp"
+#include "duckdb/parser/parsed_data/drop_info.hpp"
+#include "duckdb/parser/statement/prepare_statement.hpp"
+#include "duckdb/parser/statement/export_statement.hpp"
+#include "duckdb/parser/parsed_data/copy_info.hpp"
+#include "duckdb/parser/statement/insert_statement.hpp"
+#include "duckdb/parser/statement/vacuum_statement.hpp"
 
 namespace duckdb {
 
@@ -106,11 +119,35 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement() {
 	if (RandomPercentage(60)) {
 		return GenerateStatement(StatementType::DETACH_STATEMENT);
 	}
+	if (RandomPercentage(50)) {
+		return GenerateStatement(StatementType::PRAGMA_STATEMENT);
+	} 
 	if (RandomPercentage(30)) {
 		return GenerateStatement(StatementType::SET_STATEMENT);
 	}
 	if (RandomPercentage(40)) { // 20
 		return GenerateStatement(StatementType::DELETE_STATEMENT);
+	}
+	if (RandomPercentage(10)) {
+		return GenerateCopyDatabase();
+	}
+	if (RandomPercentage(20)) {
+		return GenerateStatement(StatementType::EXPLAIN_STATEMENT);
+	}
+		if (RandomPercentage(20)) {
+		return GenerateStatement(StatementType::TRANSACTION_STATEMENT);
+	}
+	if (RandomPercentage(20)) {
+		return GenerateDrop();
+	}
+	if (RandomPercentage(20)) {
+		return GenerateExport();
+	}
+	if (RandomPercentage(20)) {
+		return GenerateInsert();
+	}
+	if (RandomPercentage(20)) {
+		return GenerateVacuum();
 	}
 	return GenerateStatement(StatementType::CREATE_STATEMENT);
 }
@@ -130,6 +167,22 @@ unique_ptr<SQLStatement> StatementGenerator::GenerateStatement(StatementType typ
 		return GenerateSet();
 	case StatementType::DELETE_STATEMENT:
 		return GenerateDelete();
+	case StatementType::PRAGMA_STATEMENT:
+		return GeneratePragma();
+	case StatementType::COPY_DATABASE_STATEMENT:
+		return GenerateCopyDatabase();
+	case StatementType::EXPLAIN_STATEMENT:
+		return GenerateExplain();
+	case StatementType::TRANSACTION_STATEMENT:
+		return GenerateTransaction();
+	case StatementType::DROP_STATEMENT:
+		return GenerateDrop();
+	case StatementType::EXPORT_STATEMENT:
+		return GenerateExport();
+	case StatementType::INSERT_STATEMENT:
+		return GenerateInsert();
+	case StatementType::VACUUM_STATEMENT:
+		return GenerateVacuum();
 	default:
 		throw InternalException("Unsupported type");
 	}
@@ -198,6 +251,156 @@ unique_ptr<DeleteStatement> StatementGenerator::GenerateDelete() {
 	}
 
 	return delete_statement;
+}
+
+//===--------------------------------------------------------------------===//
+// Generate Pragma
+//===--------------------------------------------------------------------===//
+
+unique_ptr<PragmaStatement> StatementGenerator::GeneratePragma() {
+	auto pragma_stmt = make_uniq<PragmaStatement>();
+	pragma_stmt->info = make_uniq<PragmaInfo>();
+	// getting a random pragma_function
+	if (!generator_context->pragma_functions.empty()) {
+		auto &entry = Choose(generator_context->pragma_functions).get();
+		pragma_stmt->info->name = entry.name;
+	} else {
+		pragma_stmt->info->name = "enable_progress_bar";
+	}
+	if (RandomPercentage(50)) {
+		pragma_stmt->info->parameters.push_back(GenerateConstant());
+	}
+	return pragma_stmt;
+}
+
+//===--------------------------------------------------------------------===//
+// Copy Database Statement
+//===--------------------------------------------------------------------===//
+
+unique_ptr<CopyDatabaseStatement> StatementGenerator::GenerateCopyDatabase() {
+    auto from_db = GetRandomAttachedDataBase();
+    auto to_db = string("db_") + RandomString(6);
+    auto mode = RandomPercentage(50) ? CopyDatabaseType::COPY_SCHEMA : CopyDatabaseType::COPY_DATA;
+    return make_uniq<CopyDatabaseStatement>(std::move(from_db), std::move(to_db), mode);
+}
+
+//===--------------------------------------------------------------------===//
+// Transaction Statement
+//===--------------------------------------------------------------------===//
+
+unique_ptr<TransactionStatement> StatementGenerator::GenerateTransaction() {
+    auto t = Choose<TransactionType>({
+        TransactionType::BEGIN_TRANSACTION,
+        TransactionType::COMMIT,
+        TransactionType::ROLLBACK
+    });
+	auto info = make_uniq<TransactionInfo>(t);
+    return make_uniq<TransactionStatement>(std::move(info));
+}
+
+//===--------------------------------------------------------------------===//
+// Explain Statement
+//===--------------------------------------------------------------------===//
+
+unique_ptr<ExplainStatement> StatementGenerator::GenerateExplain() {
+	unique_ptr<SQLStatement> payload;
+    if (RandomPercentage(70)) {
+        payload = GenerateStatement(StatementType::SELECT_STATEMENT);
+    } else {
+        payload = GenerateStatement(Choose<StatementType>({
+            StatementType::DELETE_STATEMENT,
+            StatementType::UPDATE_STATEMENT,
+            StatementType::CREATE_STATEMENT
+        }));
+    }
+    auto stmt = make_uniq<ExplainStatement>(
+        std::move(payload),
+        ExplainType::EXPLAIN_STANDARD,
+        ExplainFormat::DEFAULT
+    );
+    return stmt;
+}
+
+//===--------------------------------------------------------------------===//
+// Drop Statement
+//===--------------------------------------------------------------------===//
+
+unique_ptr<DropStatement> StatementGenerator::GenerateDrop() {
+	auto info = make_uniq<DropInfo>();
+
+	info->type = Choose<CatalogType>({
+		CatalogType::TABLE_ENTRY,
+		CatalogType::VIEW_ENTRY,
+		CatalogType::SCHEMA_ENTRY,
+		CatalogType::SEQUENCE_ENTRY
+	});
+
+	info->schema = DEFAULT_SCHEMA;
+	if (!generator_context->tables_and_views.empty() &&
+		(info->type == CatalogType::TABLE_ENTRY || info->type == CatalogType::VIEW_ENTRY)) {
+		auto &entry = Choose(generator_context->tables_and_views).get();
+		info->name = entry.name;
+	} else {
+		info->name = GenerateIdentifier();
+	}
+	auto stmt = make_uniq<DropStatement>();
+	stmt->info = std::move(info);
+	return stmt;
+}
+
+//===--------------------------------------------------------------------===//
+// Prepare Statement
+//===--------------------------------------------------------------------===//
+
+unique_ptr<PrepareStatement> StatementGenerator::GeneratePrepare() {
+    auto stmt = make_uniq<PrepareStatement>();
+    stmt->name = string("prep_") + RandomString(6);
+    stmt->statement = unique_ptr_cast<SQLStatement, SelectStatement>(GenerateSelect());
+    return stmt;
+}
+
+//===--------------------------------------------------------------------===//
+// Export Statement
+//===--------------------------------------------------------------------===//
+
+unique_ptr<ExportStatement> StatementGenerator::GenerateExport() {
+	auto info = make_uniq<CopyInfo>();
+	auto stmt = make_uniq<ExportStatement>(std::move(info));
+	if (!generator_context->attached_databases.empty()) {
+		stmt->database = GetRandomAttachedDataBase();
+	} else {
+		stmt->database = string();
+	}
+	return stmt;
+}
+
+//===--------------------------------------------------------------------===//
+// Insert Statement
+//===--------------------------------------------------------------------===//
+
+unique_ptr<InsertStatement> StatementGenerator::GenerateInsert() {
+    auto stmt = make_uniq<InsertStatement>();
+	// firts try to insert to real table
+    if (!generator_context->tables_and_views.empty()) {
+        auto &entry = Choose(generator_context->tables_and_views).get();
+        if (entry.type == CatalogType::TABLE_ENTRY) {
+            stmt->table = entry.name;
+            stmt->select_statement = GenerateSelect();
+            return stmt;
+        }
+    }
+    stmt->table = GenerateTableIdentifier();
+    stmt->select_statement = GenerateSelect();
+    return stmt;
+}
+
+//===--------------------------------------------------------------------===//
+// Vacuum Statement
+//===--------------------------------------------------------------------===//
+
+unique_ptr<VacuumStatement> StatementGenerator::GenerateVacuum() {
+	duckdb::VacuumOptions opts;
+    return make_uniq<VacuumStatement>(opts);
 }
 
 //===--------------------------------------------------------------------===//

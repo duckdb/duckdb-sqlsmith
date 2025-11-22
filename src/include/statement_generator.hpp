@@ -98,6 +98,15 @@ private:
 	unique_ptr<ParsedExpression> GenerateComparison();
 	unique_ptr<ParsedExpression> GeneratePositionalReference();
 	unique_ptr<ParsedExpression> GenerateCase();
+	unique_ptr<PragmaStatement> GeneratePragma();
+	unique_ptr<CopyDatabaseStatement> GenerateCopyDatabase();
+	unique_ptr<ExplainStatement> GenerateExplain();
+	unique_ptr<TransactionStatement> GenerateTransaction();
+	unique_ptr<DropStatement> GenerateDrop();
+	unique_ptr<PrepareStatement> GeneratePrepare();
+	unique_ptr<ExportStatement> GenerateExport();
+	unique_ptr<InsertStatement> GenerateInsert();
+	unique_ptr<VacuumStatement> GenerateVacuum();
 
 	unique_ptr<OrderModifier> GenerateOrderBy();
 	unique_ptr<OrderModifier> GenerateOrderByAll();
