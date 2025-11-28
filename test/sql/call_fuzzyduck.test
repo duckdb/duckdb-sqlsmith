@@ -7,7 +7,7 @@ mode skip
 require sqlsmith
 
 statement ok
-call fuzzyduck(max_queries=2, max_query_length=50000, verbose_output=1, log='sqlsmith.log', complete_log='sqlsmith.complete.log', enable_verification=True);
+call fuzzyduck(max_queries=2, verbose_output=1, log='sqlsmith.log', complete_log='sqlsmith.complete.log', enable_verification=True, randoms_config_filepath='config_nested.json');
 
 statement ok
 call fuzzyduck(max_queries=2, max_query_length=50000, verbose_output=1, log='__TEST_DIR__/logs.txt', complete_log='__TEST_DIR__/clog.txt', enable_verification=false);
