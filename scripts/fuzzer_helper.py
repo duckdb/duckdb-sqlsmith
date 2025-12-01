@@ -13,11 +13,18 @@ REPO_NAME = 'duckdb-fuzzer'
 
 INTERNAL_ERROR_STRINGS = [
     "differs from original result",
-    "internal",
+    "internal error",
+    "internal exception",
     "signed integer overflow",
     "sanitizer",
     "runtime error",
     "abort",
+]
+
+INTERNAL_ERROR_FALSE_POSITIVES = [
+    "internal use",
+    "internal_compress",
+    "internal_decompress",
 ]
 
 fuzzer_desc = '''Issue found by ${FUZZER} on git commit hash [${SHORT_HASH}](https://github.com/duckdb/duckdb/commit/${FULL_HASH}) using seed ${SEED}.
@@ -241,12 +248,24 @@ def file_issue(cmd, exception_msg, stacktrace, fuzzer, seed, hash):
 
 
 def is_internal_error(error_str: str):
-    return any(internal_error in error_str.lower() for internal_error in INTERNAL_ERROR_STRINGS)
+    if any(internal_error in error_str.lower() for internal_error in INTERNAL_ERROR_STRINGS):
+        return True
+    # remove false positives
+    error_str_cleaned = error_str.lower()
+    for false_positive in INTERNAL_ERROR_FALSE_POSITIVES:
+        error_str_cleaned = error_str_cleaned.replace(false_positive, '')
+    if 'internal' in error_str_cleaned:
+        # error message contains word 'internal' in context that is neiter white-listed nor black-listed.
+        # consider it an internal error (we rather have a false-postive then miss a critical error)
+        return True
+    else:
+        return False
 
 
 def get_internal_exception_msg(error_str: str):
-    pattern = rf"^.*?(?:{"|".join(INTERNAL_ERROR_STRINGS)}).*?$"
+    pattern = rf"^.*?(?:{"|".join(INTERNAL_ERROR_STRINGS + ['internal'])}).*?$"
     exception_match = re.search(pattern, error_str, flags=(re.MULTILINE | re.IGNORECASE))
+    assert exception_match  # there should be an exception message, assuming is_internal_error() == True
     exception_msg = exception_match.group()
     _, _, trace = error_str.partition(exception_msg)
     return (exception_msg, trace)
