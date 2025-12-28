@@ -42,8 +42,8 @@ StatementGenerator::StatementGenerator(ClientContext &context) : context(context
 }
 
 StatementGenerator::StatementGenerator(StatementGenerator &parent_p)
-    : verification_enabled(parent_p.verification_enabled), context(parent_p.context), parent(&parent_p),
-      generator_context(parent_p.generator_context), depth(parent_p.depth + 1) {
+    : config(parent_p.config), verification_enabled(parent_p.verification_enabled), context(parent_p.context), parent(&parent_p), 
+		generator_context(parent_p.generator_context), depth(parent_p.depth + 1) {
 	if (depth > MAX_DEPTH) {
 		throw InternalException("depth too high");
 	}
@@ -93,23 +93,23 @@ std::shared_ptr<GeneratorContext> StatementGenerator::GetDatabaseState(ClientCon
 }
 
 unique_ptr<SQLStatement> StatementGenerator::GenerateStatement() {
-	if (RandomPercentage(80)) {
+	if (RandomPercentage(config[RandomPercentagesEnum::SELECT])) {
 		return GenerateStatement(StatementType::SELECT_STATEMENT);
 	}
-	if (RandomPercentage(40)) {
-		if (RandomPercentage(50)) {
+	if (RandomPercentage(config[RandomPercentagesEnum::ATTACH])) {
+		if (RandomPercentage(config[RandomPercentagesEnum::ATTACH_USE])) {
 			// We call this directly so we have a higher chance to fuzz persistent databases
 			return GenerateAttachUse();
 		}
 		return GenerateStatement(StatementType::ATTACH_STATEMENT);
 	}
-	if (RandomPercentage(60)) {
+	if (RandomPercentage(config[RandomPercentagesEnum::DETACH])) {
 		return GenerateStatement(StatementType::DETACH_STATEMENT);
 	}
-	if (RandomPercentage(30)) {
+	if (RandomPercentage(config[RandomPercentagesEnum::SET])) {
 		return GenerateStatement(StatementType::SET_STATEMENT);
 	}
-	if (RandomPercentage(40)) { // 20
+	if (RandomPercentage(config[RandomPercentagesEnum::DELETE])) { //20
 		return GenerateStatement(StatementType::DELETE_STATEMENT);
 	}
 	return GenerateStatement(StatementType::CREATE_STATEMENT);
@@ -165,7 +165,7 @@ unique_ptr<DetachStatement> StatementGenerator::GenerateDetach() {
 // generate USE statement
 unique_ptr<SetStatement> StatementGenerator::GenerateSet() {
 	auto name_expr = make_uniq<ConstantExpression>(GenerateDataBaseName());
-	if (RandomPercentage(90)) {
+	if (RandomPercentage(config[RandomPercentagesEnum::SET])) { // 90
 		auto name = GetRandomAttachedDataBase();
 		name_expr = make_uniq<ConstantExpression>(Value(name));
 	}
@@ -206,7 +206,7 @@ unique_ptr<DeleteStatement> StatementGenerator::GenerateDelete() {
 
 unique_ptr<DetachInfo> StatementGenerator::GenerateDetachInfo() {
 	auto info = make_uniq<DetachInfo>();
-	if (RandomPercentage(20)) {
+	if (RandomPercentage(config[RandomPercentagesEnum::DETACH_RANDOM_NAME])) { //20
 		info->name = "RANDOM_NAME_" + RandomString(15);
 	} else {
 		info->name = GetRandomAttachedDataBase();
@@ -312,23 +312,23 @@ void StatementGenerator::GenerateCTEs(QueryNode &node) {
 unique_ptr<QueryNode> StatementGenerator::GenerateQueryNode() {
 	unique_ptr<QueryNode> result;
 	bool is_distinct = false;
-	if (RandomPercentage(70)) {
+	if (RandomPercentage(config[RandomPercentagesEnum::SELECT_NODE])) { // 70
 		// select node
 		auto select_node = make_uniq<SelectNode>();
 		// generate CTEs
 		GenerateCTEs(*select_node);
 
-		is_distinct = RandomPercentage(30);
-		if (RandomPercentage(95)) {
+		is_distinct = RandomPercentage(config[RandomPercentagesEnum::SELECT_NODE_IS_DISTINCT]); // 30
+		if (RandomPercentage(config[RandomPercentagesEnum::SELECT_NODE_FROM_TABLE])) { // 95
 			select_node->from_table = GenerateTableRef();
 		}
 		select_node->select_list = GenerateChildren(1, 10);
-		select_node->where_clause = RandomExpression(60);
-		select_node->having = RandomExpression(25);
-		if (RandomPercentage(30)) {
+		select_node->where_clause = RandomExpression(config[RandomPercentagesEnum::SELECT_NODE_WHERE]); // 60
+		select_node->having = RandomExpression(config[RandomPercentagesEnum::SELECT_NODE_HAVING]); // 25
+		if (RandomPercentage(config[RandomPercentagesEnum::SELECT_NODE_GROUPS])) { // 30
 			select_node->groups.group_expressions = GenerateChildren(1, 5);
 			auto group_count = select_node->groups.group_expressions.size();
-			if (RandomPercentage(70)) {
+			if (RandomPercentage(config[RandomPercentagesEnum::SELECT_NODE_GROUP_BY])) { // 70
 				// single GROUP BY
 				GroupingSet set;
 				for (idx_t i = 0; i < group_count; i++) {
@@ -352,27 +352,29 @@ unique_ptr<QueryNode> StatementGenerator::GenerateQueryNode() {
 				}
 			}
 		}
-		select_node->qualify = RandomExpression(10);
+		select_node->qualify = RandomExpression(config[RandomPercentagesEnum::SELECT_NODE_QUALIFY]); // 10
 		select_node->aggregate_handling =
-		    RandomPercentage(10) ? AggregateHandling::FORCE_AGGREGATES : AggregateHandling::STANDARD_HANDLING;
-		if (RandomPercentage(10)) {
+		    RandomPercentage(config[RandomPercentagesEnum::SELECT_NODE_AGGREGATE]) ? AggregateHandling::FORCE_AGGREGATES : AggregateHandling::STANDARD_HANDLING; // 10
+		if (RandomPercentage(config[RandomPercentagesEnum::SELECT_NODE_SAMPLE])) {
 			auto sample = make_uniq<SampleOptions>();
-			sample->is_percentage = RandomPercentage(50);
+			sample->is_percentage = RandomPercentage(config[RandomPercentagesEnum::SELECT_NODE_SAMPLE_IS_PERC]); //50
 			if (sample->is_percentage) {
-				sample->sample_size = Value::BIGINT(RandomValue(100));
+				sample->sample_size = Value::BIGINT(RandomValue(config[RandomPercentagesEnum::SELECT_NODE_SAMPLE_SIZE])); // 100 - maybe we can replace the whole ->is_percentage thing with the sample size defined in the config.json
 			} else {
 				sample->sample_size = Value::BIGINT(RandomValue(99999));
 			}
-			sample->method = Choose<SampleMethod>(
+			sample->method = Choose<SampleMethod>( // maybe here is also go like sample->method = <SampleMethod>(config[RandomPercentagesEnum::SELECT_NODE_SAMPLE_METHOD])?
 			    {SampleMethod::BERNOULLI_SAMPLE, SampleMethod::RESERVOIR_SAMPLE, SampleMethod::SYSTEM_SAMPLE});
 			select_node->sample = std::move(sample);
 		}
 		result = std::move(select_node);
-	} else {
+	} else if (RandomPercentage(config[RandomPercentagesEnum::SETOP])) {
+		// limit the count of generated setops
 		auto setop = make_uniq<SetOperationNode>();
 		GenerateCTEs(*setop);
+		//should be possible to choose: from the complete enum, from only one enum value defined in config file, from 2-3 enum values
 		setop->setop_type = Choose<SetOperationType>({SetOperationType::EXCEPT, SetOperationType::INTERSECT,
-		                                              SetOperationType::UNION, SetOperationType::UNION_BY_NAME});
+													SetOperationType::UNION, SetOperationType::UNION_BY_NAME});
 		setop->left = GenerateQueryNode();
 		setop->right = GenerateQueryNode();
 		switch (setop->setop_type) {
@@ -388,6 +390,8 @@ unique_ptr<QueryNode> StatementGenerator::GenerateQueryNode() {
 			throw InternalException("Unsupported set operation type");
 		}
 		result = std::move(setop);
+	} else {
+		result = std::move(make_uniq<SelectNode>());
 	}
 
 	if (is_distinct) {
@@ -396,14 +400,14 @@ unique_ptr<QueryNode> StatementGenerator::GenerateQueryNode() {
 	if (verification_enabled) {
 		result->modifiers.push_back(GenerateOrderByAll());
 	} else if (!verification_enabled) {
-		if (RandomPercentage(5)) {
+		if (RandomPercentage(config[RandomPercentagesEnum::RESULT_MODIFIERS])) { // 5
 			result->modifiers.push_back(GenerateOrderBy());
 		}
-		if (RandomPercentage(50)) {
+		if (RandomPercentage(config[RandomPercentagesEnum::LIMIT_PERCENT_MODIFIER])) { // 50
 			auto limit_percent_modifier = make_uniq<LimitPercentModifier>();
-			if (RandomPercentage(30)) {
+			if (RandomPercentage(config[RandomPercentagesEnum::LIMIT_PERCENT_MODIFIER_LIMIT])) { // 30
 				limit_percent_modifier->limit = GenerateExpression();
-			} else if (RandomPercentage(30)) {
+			} else if (RandomPercentage(config[RandomPercentagesEnum::LIMIT_PERCENT_MODIFIER_OFFSET])) { // 30
 				limit_percent_modifier->offset = GenerateExpression();
 			} else {
 				limit_percent_modifier->limit = GenerateExpression();
@@ -412,9 +416,9 @@ unique_ptr<QueryNode> StatementGenerator::GenerateQueryNode() {
 			result->modifiers.push_back(std::move(limit_percent_modifier));
 		} else {
 			auto limit_modifier = make_uniq<LimitModifier>();
-			if (RandomPercentage(30)) {
+			if (RandomPercentage(config[RandomPercentagesEnum::LIMIT_MODIFIER_LIMIT])) { // 30
 				limit_modifier->limit = GenerateExpression();
-			} else if (RandomPercentage(30)) {
+			} else if (RandomPercentage(config[RandomPercentagesEnum::LIMIT_MODIFIER_OFFSET])) { // 30
 				limit_modifier->offset = GenerateExpression();
 			} else {
 				limit_modifier->limit = GenerateExpression();
@@ -430,13 +434,13 @@ unique_ptr<QueryNode> StatementGenerator::GenerateQueryNode() {
 // Table Ref
 //===--------------------------------------------------------------------===//
 unique_ptr<TableRef> StatementGenerator::GenerateTableRef() {
-	if (RandomPercentage(60)) {
+	if (RandomPercentage(config[RandomPercentagesEnum::TABLE_REF_BASE_TABLE_REF_PERC])) {
 		return GenerateBaseTableRef();
 	}
-	if (RandomPercentage(20)) {
+	if (RandomPercentage(config[RandomPercentagesEnum::TABLE_REF_EXPRESSION_LIST_REF])) {
 		return GenerateExpressionListRef();
 	}
-	if (RandomPercentage(40)) {
+	if (RandomPercentage(config[RandomPercentagesEnum::TABLE_REF_JOIN_REF])) {
 		return GenerateJoinRef();
 	}
 	switch (RandomValue(3)) {
@@ -496,13 +500,13 @@ unique_ptr<TableRef> StatementGenerator::GenerateExpressionListRef() {
 
 unique_ptr<TableRef> StatementGenerator::GenerateJoinRef() {
 	JoinRefType join_ref;
-	if (RandomPercentage(10)) {
+	if (RandomPercentage(config[RandomPercentagesEnum::JOIN_REF_CROSS])) {
 		join_ref = JoinRefType::CROSS;
-	} else if (RandomPercentage(10)) {
+	} else if (RandomPercentage(config[RandomPercentagesEnum::JOIN_REF_ASOF])) {
 		join_ref = JoinRefType::ASOF;
-	} else if (RandomPercentage(10)) {
+	} else if (RandomPercentage(config[RandomPercentagesEnum::JOIN_REF_NATURAL])) {
 		join_ref = JoinRefType::NATURAL;
-	} else if (RandomPercentage(10)) {
+	} else if (RandomPercentage(config[RandomPercentagesEnum::JOIN_REF_POSITIONAL])) {
 		join_ref = JoinRefType::POSITIONAL;
 	} else {
 		join_ref = JoinRefType::REGULAR;
@@ -511,7 +515,7 @@ unique_ptr<TableRef> StatementGenerator::GenerateJoinRef() {
 	join->left = GenerateTableRef();
 	join->right = GenerateTableRef();
 	if (join_ref != JoinRefType::CROSS && join_ref != JoinRefType::NATURAL) {
-		if (RandomPercentage(70)) {
+		if (RandomPercentage(config[RandomPercentagesEnum::JOIN_REF_GENERAL_EXPRESSION])) {
 			join->condition = GenerateExpression();
 		} else {
 			while (true) {
@@ -654,13 +658,13 @@ public:
 
 unique_ptr<ParsedExpression> StatementGenerator::GenerateExpression() {
 	ExpressionDepthChecker checker(*this);
-	if (RandomPercentage(50) || RandomPercentage(expression_depth + depth * 5)) {
+	if (RandomPercentage(config[RandomPercentagesEnum::EXPRESSION_COLUMN_REF]) || RandomPercentage(expression_depth + depth * 5)) {
 		return GenerateColumnRef();
 	}
-	if (RandomPercentage(30)) {
+	if (RandomPercentage(config[RandomPercentagesEnum::EXPRESSION_CONSTANT])) {
 		return GenerateConstant();
 	}
-	if (RandomPercentage(3)) {
+	if (RandomPercentage(config[RandomPercentagesEnum::EXPRESSION_SUBQUERY])) {
 		return GenerateSubquery();
 	}
 	switch (RandomValue(9)) {
@@ -688,10 +692,10 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateExpression() {
 }
 
 Value StatementGenerator::GenerateConstantValue() {
-	if (RandomPercentage(50)) {
+	if (RandomPercentage(config[RandomPercentagesEnum::CONSTANT_VALUE_BIGINT])) {
 		return Value::BIGINT(RandomValue(9999));
 	}
-	if (RandomPercentage(30)) {
+	if (RandomPercentage(config[RandomPercentagesEnum::CONSTANT_VALUE_TO_STRING])) {
 		return Value(UUID::ToString(UUID::GenerateRandomUUID(RandomEngine::Get(context))));
 	}
 	auto &val = Choose(generator_context->test_types);
@@ -777,7 +781,7 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateFunction() {
 		if (actual_function.varargs.id() != LogicalTypeId::INVALID) {
 			max_parameters += 5;
 		}
-		if (RandomPercentage(10) && !in_window) {
+		if (RandomPercentage(config[RandomPercentagesEnum::FUNCTION_AGGREGATE_WINDOW_FUNCTION]) && !in_window) {
 			return GenerateWindowFunction(&actual_function);
 		}
 		if (in_aggregate) {
@@ -785,12 +789,12 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateFunction() {
 			return GenerateColumnRef();
 		}
 		checker = make_uniq<AggregateChecker>(*this);
-		filter = RandomExpression(10);
-		if (RandomPercentage(10)) {
+		filter = RandomExpression(config[RandomPercentagesEnum::FUNCTION_AGGREGATE_FILTER]);
+		if (RandomPercentage(config[RandomPercentagesEnum::FUNCTION_AGGREGATE_ORDER_BY])) {
 			// generate order by
 			order_bys = GenerateOrderBy();
 		}
-		if (RandomPercentage(10)) {
+		if (RandomPercentage(config[RandomPercentagesEnum::FUNCTION_AGGREGATE_DISTINCT])) {
 			distinct = true;
 		}
 		break;
@@ -969,15 +973,15 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateWindowFunction(optional
 	WindowChecker checker(*this);
 	auto result = make_uniq<WindowExpression>(type, INVALID_CATALOG, INVALID_SCHEMA, std::move(name));
 	result->children = GenerateChildren(min_parameters, max_parameters);
-	while (RandomPercentage(50)) {
+	while (RandomPercentage(config[RandomPercentagesEnum::WINDOW_FUNCTION_PARTITIONS])) {
 		result->partitions.push_back(GenerateExpression());
 	}
-	if (RandomPercentage(30)) {
+	if (RandomPercentage(config[RandomPercentagesEnum::WINDOW_FUNCTION_ORDERS])) {
 		result->orders = std::move(GenerateOrderBy()->orders);
 	}
 	if (function) {
-		result->filter_expr = RandomExpression(30);
-		if (RandomPercentage(30)) {
+		result->filter_expr = RandomExpression(config[RandomPercentagesEnum::WINDOW_FUNCTION_FILTER_EXPRESSION]);
+		if (RandomPercentage(config[RandomPercentagesEnum::WINDOW_FUNCTION_IGNORE_NULLS])) {
 			result->ignore_nulls = true;
 		}
 	}
@@ -1014,8 +1018,8 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateWindowFunction(optional
 	switch (type) {
 	case ExpressionType::WINDOW_LEAD:
 	case ExpressionType::WINDOW_LAG:
-		result->offset_expr = RandomExpression(30);
-		result->default_expr = RandomExpression(30);
+		result->offset_expr = RandomExpression(config[RandomPercentagesEnum::WINDOW_FUNCTION_RESULT_OFFSET]);
+		result->default_expr = RandomExpression(config[RandomPercentagesEnum::WINDOW_FUNCTION_RESULT_DEFAULT]);
 		break;
 	default:
 		break;
@@ -1050,19 +1054,19 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateConjunction() {
 unique_ptr<ParsedExpression> StatementGenerator::GenerateStar() {
 	auto result = make_uniq<StarExpression>();
 	if (!current_relation_names.empty()) {
-		if (RandomPercentage(10)) {
+		if (RandomPercentage(config[RandomPercentagesEnum::STAR_RELATION_NAME])) {
 			result->relation_name = GenerateRelationName();
 		}
 	}
 	if (!verification_enabled) {
-		while (RandomPercentage(20)) {
+		while (RandomPercentage(config[RandomPercentagesEnum::STAR_COLUMN_NAME_EXCLUDE_LIST])) {
 			auto column_name = GenerateColumnName();
 			if (column_name.empty()) {
 				break;
 			}
 			result->exclude_list.insert(column_name);
 		}
-		while (RandomPercentage(20)) {
+		while (RandomPercentage(config[RandomPercentagesEnum::STAR_COLUMN_NAME_REPLACE_LIST])) {
 			auto column_name = GenerateColumnName();
 			if (column_name.empty()) {
 				break;

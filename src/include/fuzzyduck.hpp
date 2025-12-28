@@ -10,8 +10,10 @@
 
 #include "duckdb.hpp"
 #include "duckdb/parser/query_node.hpp"
+#include "random_nums_config.hpp"
 
 namespace duckdb {
+
 struct FileHandle;
 
 class FuzzyDuck {
@@ -28,6 +30,9 @@ public:
 	bool verbose_output = false;
 	bool enable_verification = false;
 	idx_t timeout = 30;
+	string randoms_config_filepath;
+	// RandomNumsConfig config;
+	unordered_map<RandomPercentagesEnum, idx_t> config;
 
 public:
 	void Fuzz();
@@ -51,6 +56,7 @@ private:
 
 private:
 	unique_ptr<FileHandle> complete_log_handle;
+	unique_ptr<FileHandle> randoms_config_handle;
 };
 
 } // namespace duckdb

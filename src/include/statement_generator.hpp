@@ -11,6 +11,7 @@
 #include "duckdb.hpp"
 #include "duckdb/parser/parsed_data/detach_info.hpp"
 #include "duckdb/parser/query_node.hpp"
+#include "random_nums_config.hpp"
 
 #define TESTING_DIRECTORY_NAME "duckdb_unittest_tempdir"
 
@@ -40,6 +41,7 @@ public:
 	friend class ExpressionDepthChecker;
 	friend class AggregateChecker;
 	friend class WindowChecker;
+	unordered_map<RandomPercentagesEnum, idx_t> config;
 
 public:
 	StatementGenerator(ClientContext &context);
@@ -55,6 +57,8 @@ public:
 	bool RandomPercentage(idx_t percentage);
 	bool verification_enabled = false;
 	idx_t RandomValue(idx_t max);
+	
+
 	string GetRandomAttachedDataBase();
 	unique_ptr<SQLStatement> GenerateStatement(StatementType type); // came from private
 

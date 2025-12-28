@@ -147,6 +147,8 @@ static duckdb::unique_ptr<FunctionData> FuzzyDuckBind(ClientContext &context, Ta
 			result->fuzzer.verbose_output = BooleanValue::Get(kv.second);
 		} else if (kv.first == "enable_verification") {
 			result->fuzzer.enable_verification = BooleanValue::Get(kv.second);
+		} else if (kv.first == "randoms_config_filepath") {
+			result->fuzzer.randoms_config_filepath = StringValue::Get(kv.second);
 		}
 	}
 	return_types.emplace_back(LogicalType::BOOLEAN);
@@ -196,6 +198,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 	fuzzy_duck_fun.named_parameters["complete_log"] = LogicalType::VARCHAR;
 	fuzzy_duck_fun.named_parameters["verbose_output"] = LogicalType::BOOLEAN;
 	fuzzy_duck_fun.named_parameters["enable_verification"] = LogicalType::BOOLEAN;
+	fuzzy_duck_fun.named_parameters["randoms_config_filepath"] = LogicalType::VARCHAR;
 	loader.RegisterFunction(fuzzy_duck_fun);
 
 	TableFunction fuzz_all_functions("fuzz_all_functions", {}, FuzzAllFunctions, FuzzyDuckBind);

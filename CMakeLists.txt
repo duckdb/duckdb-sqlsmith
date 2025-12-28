@@ -20,6 +20,7 @@ add_subdirectory(src/third_party/sqlsmith)
 set(EXTENSION_SOURCES src/sqlsmith_extension.cpp
         src/statement_generator.cpp
         src/statement_simplifier.cpp
+        src/random_nums_config.cpp
         src/fuzzyduck.cpp ${EXTENSION_OBJECT_FILES})
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
