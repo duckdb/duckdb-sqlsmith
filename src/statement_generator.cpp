@@ -373,8 +373,9 @@ unique_ptr<QueryNode> StatementGenerator::GenerateQueryNode() {
 		GenerateCTEs(*setop);
 		setop->setop_type = Choose<SetOperationType>({SetOperationType::EXCEPT, SetOperationType::INTERSECT,
 		                                              SetOperationType::UNION, SetOperationType::UNION_BY_NAME});
-		setop->left = GenerateQueryNode();
-		setop->right = GenerateQueryNode();
+		for(idx_t i = 0; i < 2; i++) {
+			setop->children.push_back(GenerateQueryNode());
+		}
 		switch (setop->setop_type) {
 		case SetOperationType::EXCEPT:
 		case SetOperationType::INTERSECT:
