@@ -7,3 +7,4 @@ testext
 scripts/__pycache__/
 test/python/__pycache__/
 .Rhistory
+.vscode
