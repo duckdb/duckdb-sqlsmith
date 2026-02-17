@@ -11,21 +11,11 @@
 #include "duckdb.hpp"
 #include "duckdb/parser/parsed_data/detach_info.hpp"
 #include "duckdb/parser/query_node.hpp"
+#include "duckdb/parser/tokens.hpp"
 
 #define TESTING_DIRECTORY_NAME "duckdb_unittest_tempdir"
 
 namespace duckdb {
-class SQLStatement;
-class SelectStatement;
-class InsertStatement;
-class UpdateStatement;
-class DeleteStatement;
-class SetStatement;
-class TableRef;
-class SelectNode;
-class SetOperationNode;
-class QueryNode;
-class ParsedExpression;
 class ResultModifier;
 class OrderModifier;
 class UpdateSetInfo;
