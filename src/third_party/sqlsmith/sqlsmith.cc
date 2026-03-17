@@ -24,8 +24,6 @@
 
 #include "duckdb/common/vector.hpp"
 
-using namespace std;
-
 using namespace std::chrono;
 
 extern "C" {
@@ -131,11 +129,11 @@ int32_t run_sqlsmith(duckdb::DatabaseInstance &database, SQLSmithOptions opt) {
 		dut = std::make_shared<dut_duckdb>(database);
 
 		if (opt.verbose_output)
-			cerr << "Running queries..." << endl;
+			std::cerr << "Running queries..." << std::endl;
 
 		bool has_complete_log = !opt.complete_log.empty();
 		bool has_log = !opt.log.empty();
-		ofstream complete_log;
+		std::ofstream complete_log;
 		if (has_complete_log) {
 			complete_log.open(opt.complete_log);
 		}
@@ -156,21 +154,21 @@ int32_t run_sqlsmith(duckdb::DatabaseInstance &database, SQLSmithOptions opt) {
 					l->generated(*gen);
 
 				/* Generate SQL from AST */
-				ostringstream s;
+				std::ostringstream s;
 				gen->out(s);
 
 				// write the query to the complete log that has all the
 				// queries
 				if (has_complete_log) {
-					complete_log << s.str() << ";" << endl;
+					complete_log << s.str() << ";" << std::endl;
 					complete_log.flush();
 				}
 
 				// write the last-executed query to a separate log file
 				if (has_log) {
-					ofstream out_file;
+					std::ofstream out_file;
 					out_file.open(opt.log);
-					out_file << s.str() << ";" << endl;
+					out_file << s.str() << ";" << std::endl;
 					out_file.close();
 				}
 
@@ -183,8 +181,8 @@ int32_t run_sqlsmith(duckdb::DatabaseInstance &database, SQLSmithOptions opt) {
 					for (auto l : loggers)
 						try {
 							l->error(*gen, e);
-						} catch (runtime_error &e) {
-							cerr << endl << "log failed: " << typeid(*l).name() << ": " << e.what() << endl;
+						} catch (std::runtime_error &e) {
+							std::cerr << std::endl << "log failed: " << typeid(*l).name() << ": " << e.what() << std::endl;
 						}
 					if ((dynamic_cast<const dut::broken *>(&e))) {
 						/* re-throw to outer loop */
@@ -193,8 +191,8 @@ int32_t run_sqlsmith(duckdb::DatabaseInstance &database, SQLSmithOptions opt) {
 				}
 			}
 		}
-	} catch (const exception &e) {
-		cerr << e.what() << endl;
+	} catch (const std::exception &e) {
+		std::cerr << e.what() << std::endl;
 		exit(1);
 	}
 }

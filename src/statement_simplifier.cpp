@@ -196,8 +196,9 @@ void StatementSimplifier::Simplify(SelectNode &node) {
 }
 
 void StatementSimplifier::Simplify(SetOperationNode &node) {
-	Simplify(node.left);
-	Simplify(node.right);
+	for(auto &child : node.children) {
+		Simplify(child);
+	}
 }
 
 void StatementSimplifier::Simplify(CommonTableExpressionMap &cte) {
@@ -218,8 +219,9 @@ void StatementSimplifier::Simplify(unique_ptr<QueryNode> &node) {
 		break;
 	case QueryNodeType::SET_OPERATION_NODE: {
 		auto &setop = node->Cast<SetOperationNode>();
-		SimplifyReplace(node, setop.left);
-		SimplifyReplace(node, setop.right);
+		for(auto &child : setop.children) {
+			SimplifyReplace(node, child);
+		}
 		Simplify(setop);
 		break;
 	}
