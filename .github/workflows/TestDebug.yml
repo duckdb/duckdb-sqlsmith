@@ -24,6 +24,10 @@ jobs:
       CRASH_ON_ASSERT: 1
 
     steps:
+      - name: "Remove pre-installed software to free up space"
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
       - name: Dependencies
         shell: bash
         run: sudo apt-get update -y -qq && sudo apt-get install -y -qq ninja-build ccache

@@ -11,6 +11,22 @@ USERNAME = 'fuzzerofducks'
 REPO_OWNER = 'duckdb'
 REPO_NAME = 'duckdb-fuzzer'
 
+INTERNAL_ERROR_STRINGS = [
+    "differs from original result",
+    "internal error",
+    "internal exception",
+    "signed integer overflow",
+    "sanitizer",
+    "runtime error",
+    "abort",
+]
+
+INTERNAL_ERROR_FALSE_POSITIVES = [
+    "internal use",
+    "internal_compress",
+    "internal_decompress",
+]
+
 fuzzer_desc = '''Issue found by ${FUZZER} on git commit hash [${SHORT_HASH}](https://github.com/duckdb/duckdb/commit/${FULL_HASH}) using seed ${SEED}.
 '''
 
@@ -170,32 +186,23 @@ def run_shell_command_batch(shell, cmd):
 
 
 def is_reproducible_issue(shell, issue) -> bool:
-    if any(label['name'] == 'AFL' for label in issue['labels']):
-        # The reproducibility of AFL issues can not be tested, because they are formatted differently.
-        # We assume they are reproducible (i.e. not fixed yet)
-        return True
     extract = extract_issue(issue['body'], issue['number'])
-    labels = issue['labels']
-    label_timeout = False
-    for label in labels:
-        if label['name'] == 'timeout':
-            label_timeout = True
     if extract is None:
         # failed extract: leave the issue as-is
         return True
     sql = extract[0] + ';'
-    if label_timeout is False:
-        print(f"Checking issue {issue['number']}...")
+    # try max 30 times to reproduce; some errors not always occur
+    for _ in range(30):
         (stdout, stderr, returncode, is_timeout) = run_shell_command_batch(shell, sql)
         if is_timeout:
             label_github_issue(issue['number'], 'timeout')
-        else:
-            if returncode == 0:
-                return False
-            if not is_internal_error(stderr):
-                return False
-    # issue is still reproducible
-    return True
+            return True
+        if returncode < 0:
+            return True
+        if is_internal_error(stderr):
+            return True
+    # issue is not reproducible
+    return False
 
 
 def get_github_issues_list() -> list[dict]:
@@ -209,12 +216,17 @@ def get_github_issues_list() -> list[dict]:
 def close_non_reproducible_issues(shell) -> dict[str, dict]:
     reproducible_issues: dict[str, dict] = {}
     for issue in get_github_issues_list():
-        if not is_reproducible_issue(shell, issue):
-            # the issue appears to be fixed - close the issue
-            print(f"Failed to reproduce issue {issue['number']}, closing...")
-            close_github_issue(int(issue['number']))
-        else:
+        if any(label['name'] in ['AFL', 'timeout'] for label in issue['labels']):
+            print(f"skipping issue {issue['number']}... (issues with label 'AFL' or 'timeout' are not auto-closed)")
+            # We assume they are reproducible (i.e. not fixed yet)
             reproducible_issues[issue['title']] = issue
+        elif is_reproducible_issue(shell, issue):
+            print(f"Issue {issue['number']} reproduced succesfully")
+            reproducible_issues[issue['title']] = issue
+        else:
+            # the issue appears to be fixed - close the issue
+            print(f"Issue {issue['number']} can not be reproduced")
+            close_github_issue(int(issue['number']))
     # retun open issues as dict, so they can be searched by title, which is the exception message without trace
     return reproducible_issues
 
@@ -235,18 +247,28 @@ def file_issue(cmd, exception_msg, stacktrace, fuzzer, seed, hash):
     make_github_issue(title, body)
 
 
-def is_internal_error(error):
-    if 'differs from original result' in error:
+def is_internal_error(error_str: str):
+    if any(internal_error in error_str.lower() for internal_error in INTERNAL_ERROR_STRINGS):
         return True
-    if 'INTERNAL' in error:
+    # remove false positives
+    error_str_cleaned = error_str.lower()
+    for false_positive in INTERNAL_ERROR_FALSE_POSITIVES:
+        error_str_cleaned = error_str_cleaned.replace(false_positive, '')
+    if 'internal' in error_str_cleaned:
+        # error message contains word 'internal' in context that is neiter white-listed nor black-listed.
+        # consider it an internal error (we rather have a false-postive then miss a critical error)
         return True
-    if 'signed integer overflow' in error:
-        return True
-    if 'Sanitizer' in error or 'sanitizer' in error:
-        return True
-    if 'runtime error' in error:
-        return True
-    return False
+    else:
+        return False
+
+
+def get_internal_exception_msg(error_str: str):
+    pattern = rf"^.*?(?:{"|".join(INTERNAL_ERROR_STRINGS + ['internal'])}).*?$"
+    exception_match = re.search(pattern, error_str, flags=(re.MULTILINE | re.IGNORECASE))
+    assert exception_match  # there should be an exception message, assuming is_internal_error() == True
+    exception_msg = exception_match.group()
+    _, _, trace = error_str.partition(exception_msg)
+    return (exception_msg, trace)
 
 
 def sanitize_stacktrace(err):
@@ -256,7 +278,22 @@ def sanitize_stacktrace(err):
     return err.strip()
 
 
+def sanitize_error(err):
+    err = re.sub(r'Error: near line \d+: ', '', err)
+    err = err.replace(os.getcwd() + '/', '')
+    err = err.replace(os.getcwd(), '')
+    err = re.sub(r'LINE \d+:.*\n', '', err)
+    err = re.sub(r' *\^ *', '', err)
+    if 'AddressSanitizer' in err:
+        match = re.search(r'[ \t]+[#]0 ([A-Za-z0-9]+) ([^\n]+)', err).groups()[1]
+        err = 'AddressSanitizer error ' + match
+    return err.strip()
+
+
 def split_exception_trace(exception_msg_full: str) -> tuple[str, str]:
-    # exception message does not contain newline, so split after first newline
-    exception_msg, _, stack_trace = exception_msg_full.partition('\n')
-    return (exception_msg.strip(), sanitize_stacktrace(stack_trace))
+    if is_internal_error(exception_msg_full):
+        exception_msg, stack_trace = get_internal_exception_msg(exception_msg_full)
+    else:
+        # exception message does not contain newline, so split after first newline
+        exception_msg, _, stack_trace = exception_msg_full.partition('\n')
+    return (sanitize_error(exception_msg), sanitize_stacktrace(stack_trace))

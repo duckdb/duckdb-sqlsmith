@@ -1,5 +1,3 @@
-import json
-import requests
 import sys
 import os
 import subprocess
@@ -15,6 +13,7 @@ shell = None
 perform_checks = True
 no_git_checks = False
 max_queries = 1000
+max_query_length = 50000
 verification = False
 
 for param in sys.argv:
@@ -40,6 +39,8 @@ for param in sys.argv:
         seed = int(param.replace('--seed=', ''))
     elif param.startswith('--max_queries='):
         max_queries = int(param.replace('--max_queries=', ''))
+    elif param.startswith('--max_query_length='):
+        max_query_length = int(param.replace('--max_query_length=', ''))
     elif param.startswith('--no-git-checks'):
         no_git_checks = param.replace('--no-git-checks=', '').lower() == 'true'
 
@@ -74,11 +75,11 @@ def get_create_db_statement(db):
 
 def get_fuzzer_call_statement(fuzzer):
     if fuzzer == 'sqlsmith':
-        return "call sqlsmith(max_queries=${MAX_QUERIES}, seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}');"
+        return "call sqlsmith(max_queries=${MAX_QUERIES}, max_query_length=${MAX_QUERY_LENGTH}, seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}');"
     elif fuzzer == 'duckfuzz':
-        return "call fuzzyduck(max_queries=${MAX_QUERIES}, seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}', enable_verification='${ENABLE_VERIFICATION}');"
+        return "call fuzzyduck(max_queries=${MAX_QUERIES}, max_query_length=${MAX_QUERY_LENGTH}, seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}', enable_verification='${ENABLE_VERIFICATION}');"
     elif fuzzer == 'duckfuzz_functions':
-        return "call fuzz_all_functions(seed=${SEED}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}');"
+        return "call fuzz_all_functions(seed=${SEED}, max_query_length=${MAX_QUERY_LENGTH}, verbose_output=1, log='${LAST_LOG_FILE}', complete_log='${COMPLETE_LOG_FILE}');"
     else:
         raise Exception("Unknown fuzzer type")
 
@@ -103,7 +104,12 @@ def run_shell_command(cmd):
 
 
 def is_known_issue(exception_msg):
-    existing_issues = fuzzer_helper.get_github_issues_by_title(exception_msg)
+    if len(exception_msg) > 240:
+        #  avoid title is too long error (maximum is 256 characters)
+        title = exception_msg[:240] + '...'
+    else:
+        title = exception_msg
+    existing_issues = fuzzer_helper.get_github_issues_by_title(title)
     if existing_issues:
         print("Skip filing duplicate issue")
         print(
@@ -138,6 +144,7 @@ create_db_statement = get_create_db_statement(db)
 call_fuzzer_statement = (
     get_fuzzer_call_statement(fuzzer)
     .replace('${MAX_QUERIES}', str(max_queries))
+    .replace('${MAX_QUERY_LENGTH}', str(max_query_length))
     .replace('${LAST_LOG_FILE}', last_query_log_file)
     .replace('${COMPLETE_LOG_FILE}', complete_log_file)
     .replace('${SEED}', str(seed))
@@ -158,16 +165,19 @@ print(
         FINISHED RUNNING
 =========================================='''
 )
-print("==============  STDOUT  ================")
-print(stdout)
-print("==============  STDERR  =================")
-print(stderr)
-print("==========================================")
 
-print(returncode)
 if returncode == 0:
-    print("==============  SUCCESS  ================")
+    print(f"returncode: {returncode} ; no errors found")
     exit(0)
+else:
+    print(f"returncode: {returncode}")
+    print("==============  CMD  ================")
+    print(cmd)
+    print("==============  STDOUT  ================")
+    print(stdout)
+    print("==============  STDERR  =================")
+    print(stderr)
+    print("==========================================")
 
 print("==============  FAILURE  ================")
 print("Attempting to reproduce and file issue...")
@@ -179,18 +189,26 @@ with open(last_query_log_file, 'r') as f:
 with open(complete_log_file, 'r') as f:
     all_queries = f.read()
 
-(stdout, stderr, returncode) = run_shell_command(create_db_statement + '\n' + all_queries)
+print("==============  All Queries  =================")
+print(all_queries)
+print("==========================================")
 
-if returncode == 0:
-    print("Failed to reproduce the issue...")
-    exit(0)
+# try max 30 times to reproduce; some errors not always occur
+cmd = create_db_statement + '\n' + all_queries
+reproducible = False
+for _ in range(30):
+    (stdout, stderr, returncode) = run_shell_command(cmd)
+    if returncode < 0 or (returncode != 0 and fuzzer_helper.is_internal_error(stderr)):
+        reproducible = True
+        break
 
 print("==============  STDOUT  ================")
 print(stdout)
 print("==============  STDERR  =================")
 print(stderr)
 print("==========================================")
-if not fuzzer_helper.is_internal_error(stderr):
+
+if not reproducible:
     print("Failed to reproduce the internal error")
     exit(0)
 
@@ -211,15 +229,19 @@ print("=========================================")
 # reduce_multi_statement checks just the last statement first as a heuristic to see if
 # only the last statement causes the error.
 required_queries = reduce_sql.reduce_multi_statement(all_queries, shell, create_db_statement)
-cmd = create_db_statement + '\n' + required_queries
+reduced_cmd = create_db_statement + '\n' + required_queries
 
 # get a new error message.
-(stdout, stderr, returncode) = run_shell_command(cmd)
-exception_msg, stacktrace = fuzzer_helper.split_exception_trace(stderr)
+(stdout, stderr, returncode) = run_shell_command(reduced_cmd)
+reduced_exception_msg, stacktrace = fuzzer_helper.split_exception_trace(stderr)
 
 # check if this is a duplicate issue
-if (not no_git_checks) and is_known_issue(exception_msg):
+if (not no_git_checks) and is_known_issue(reduced_exception_msg):
     exit(0)
+
+if returncode < 0 or (returncode != 0 and fuzzer_helper.is_internal_error(stderr)):
+    exception_msg = reduced_exception_msg
+    cmd = reduced_cmd
 
 print(f"================MARKER====================")
 print(f"After reducing: the below sql causes an internal error \n `{cmd}`")
