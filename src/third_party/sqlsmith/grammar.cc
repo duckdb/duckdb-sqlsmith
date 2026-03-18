@@ -10,8 +10,6 @@
 #include "schema.hh"
 #include "impedance.hh"
 
-using namespace std;
-
 shared_ptr<table_ref> table_ref::factory(prod *p) {
 	try {
 		if (p->level < 3 + d6()) {
@@ -24,7 +22,7 @@ shared_ptr<table_ref> table_ref::factory(prod *p) {
 			return std::make_shared<table_or_query_name>(p);
 		else
 			return std::make_shared<table_sample>(p);
-	} catch (runtime_error &e) {
+	} catch (std::runtime_error &e) {
 		p->retry();
 	}
 	return factory(p);
@@ -92,7 +90,7 @@ shared_ptr<join_cond> join_cond::factory(prod *p, table_ref &lhs, table_ref &rhs
 			return std::make_shared<expr_join_cond>(p, lhs, rhs);
 		else
 			return std::make_shared<simple_join_cond>(p, lhs, rhs);
-	} catch (runtime_error &e) {
+	} catch (std::runtime_error &e) {
 		p->retry();
 	}
 	return factory(p, lhs, rhs);
@@ -206,7 +204,7 @@ select_list::select_list(prod *p) : prod(p) {
 	do {
 		shared_ptr<value_expr> e = value_expr::factory(this);
 		value_exprs.push_back(e);
-		ostringstream name;
+		std::ostringstream name;
 		name << "c" << columns++;
 		sqltype *t = e->type;
 		assert(t);
@@ -310,7 +308,7 @@ query_spec::query_spec(prod *p, struct scope *s, bool lateral) : prod(p), myscop
 	search = bool_expr::factory(this);
 
 	if (d6() > 2) {
-		ostringstream cons;
+		std::ostringstream cons;
 		cons << "limit " << d100() + d100();
 		limit_clause = cons.str();
 	}
@@ -441,7 +439,7 @@ shared_ptr<prod> statement_factory(struct scope *s) {
 		else if (d6() > 5)
 			return std::make_shared<common_table_expression>((struct prod *)0, s);
 		return std::make_shared<query_spec>((struct prod *)0, s);
-	} catch (runtime_error &e) {
+	} catch (std::runtime_error &e) {
 		return statement_factory(s);
 	}
 }
@@ -473,7 +471,7 @@ retry:
 	} while (d6() > 3);
 	try {
 		query = std::make_shared<query_spec>(this, scope);
-	} catch (runtime_error &e) {
+	} catch (std::runtime_error &e) {
 		retry();
 		goto retry;
 	}
@@ -611,7 +609,7 @@ shared_ptr<when_clause> when_clause::factory(struct merge_stmt *p) {
 		default:
 			return std::make_shared<when_clause>(p);
 		}
-	} catch (runtime_error &e) {
+	} catch (std::runtime_error &e) {
 		p->retry();
 	}
 	return factory(p);

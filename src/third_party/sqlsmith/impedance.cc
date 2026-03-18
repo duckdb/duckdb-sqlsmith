@@ -2,15 +2,13 @@
 #include "log.hh"
 #include <iostream>
 
-using namespace std;
+static std::map<const char *, long> occurances_in_failed_query;
+static std::map<const char *, long> occurances_in_ok_query;
+static std::map<const char *, long> retries;
+static std::map<const char *, long> limited;
+static std::map<const char *, long> failed;
 
-static map<const char *, long> occurances_in_failed_query;
-static map<const char *, long> occurances_in_ok_query;
-static map<const char *, long> retries;
-static map<const char *, long> limited;
-static map<const char *, long> failed;
-
-impedance_visitor::impedance_visitor(map<const char *, long> &occured) : _occured(occured) {
+impedance_visitor::impedance_visitor(std::map<const char *, long> &occured) : _occured(occured) {
 }
 
 void impedance_visitor::visit(struct prod *p) {
@@ -46,18 +44,18 @@ bool matched(const char *name) {
 }
 
 void report() {
-	cerr << "impedance report: " << endl;
+	std::cerr << "impedance report: " << std::endl;
 	for (auto pair : occurances_in_failed_query) {
-		cerr << "  " << pretty_type(pair.first) << ": " << pair.second << "/" << occurances_in_ok_query[pair.first]
+		std::cerr << "  " << pretty_type(pair.first) << ": " << pair.second << "/" << occurances_in_ok_query[pair.first]
 		     << " (bad/ok)";
 		if (!matched(pair.first))
-			cerr << " -> BLACKLISTED";
-		cerr << endl;
+			std::cerr << " -> BLACKLISTED";
+		std::cerr << std::endl;
 	}
 }
 
 void report(std::ostream &out) {
-	out << "{\"impedance\": [ " << endl;
+	out << "{\"impedance\": [ " << std::endl;
 
 	for (auto pair = occurances_in_failed_query.begin(); pair != occurances_in_failed_query.end(); ++pair) {
 		out << "{\"prod\": \"" << pretty_type(pair->first) << "\","
@@ -68,9 +66,9 @@ void report(std::ostream &out) {
 		    << "\"retries\": " << retries[pair->first] << "} ";
 
 		if (next(pair) != occurances_in_failed_query.end())
-			out << "," << endl;
+			out << "," << std::endl;
 	}
-	out << "]}" << endl;
+	out << "]}" << std::endl;
 }
 
 void retry(const char *p) {

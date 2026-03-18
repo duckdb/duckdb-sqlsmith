@@ -10,10 +10,9 @@
 #include <regex>
 
 using namespace duckdb;
-using namespace std;
 
-static regex e_syntax(".*syntax error at or near .*");
-static regex e_internal(".*INTERNAL.*");
+static std::regex e_syntax(".*syntax error at or near .*");
+static std::regex e_internal(".*INTERNAL.*");
 
 sqlsmith_duckdb_connection::sqlsmith_duckdb_connection(duckdb::DatabaseInstance &database) {
 	// in-memory database
@@ -31,7 +30,7 @@ schema_duckdb::schema_duckdb(duckdb::DatabaseInstance &database, bool no_catalog
     : sqlsmith_duckdb_connection(database) {
 	// generate empty TPC-H schema
 	if (verbose_output)
-		cerr << "Loading tables...";
+		std::cerr << "Loading tables...";
 	auto result = connection->Query("SELECT * FROM sqlite_master WHERE type IN ('table', 'view')");
 	if (result->HasError()) {
 		result->ThrowError();
@@ -44,13 +43,13 @@ schema_duckdb::schema_duckdb(duckdb::DatabaseInstance &database, bool no_catalog
 		tables.push_back(tab);
 	}
 	if (verbose_output)
-		cerr << "done." << endl;
+		std::cerr << "done." << std::endl;
 
 	if (tables.size() == 0) {
 		throw std::runtime_error("No tables available in catalog!");
 	}
 	if (verbose_output)
-		cerr << "Loading columns and constraints...";
+		std::cerr << "Loading columns and constraints...";
 
 	for (auto t = tables.begin(); t != tables.end(); ++t) {
 		result = connection->Query("PRAGMA table_info('" + t->name + "')");
@@ -66,7 +65,7 @@ schema_duckdb::schema_duckdb(duckdb::DatabaseInstance &database, bool no_catalog
 	}
 
 	if (verbose_output)
-		cerr << "done." << endl;
+		std::cerr << "done." << std::endl;
 
 	Connection con(database);
 	auto query_result = con.Query(R"(
@@ -155,7 +154,7 @@ void sleep_thread(Connection *connection) {
 
 void dut_duckdb::test(const std::string &stmt) {
 	is_active = true;
-	thread interrupt_thread(sleep_thread, connection.get());
+	std::thread interrupt_thread(sleep_thread, connection.get());
 	auto result = connection->Query(stmt);
 	is_active = false;
 	interrupt_thread.join();

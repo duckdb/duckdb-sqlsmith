@@ -2,12 +2,10 @@
 #include "relmodel.hh"
 #include <typeinfo>
 
-using namespace std;
-
 void schema::generate_indexes(bool verbose_output) {
 
 	if (verbose_output)
-		cerr << "Generating indexes...";
+		std::cerr << "Generating indexes...";
 
 	for (auto &type : types) {
 		assert(type);
@@ -50,7 +48,7 @@ void schema::generate_indexes(bool verbose_output) {
 	}
 
 	if (verbose_output)
-		cerr << "done." << endl;
+		std::cerr << "done." << std::endl;
 
 	assert(booltype);
 	assert(inttype);

@@ -332,7 +332,7 @@ unique_ptr<QueryNode> StatementGenerator::GenerateQueryNode() {
 				// single GROUP BY
 				GroupingSet set;
 				for (idx_t i = 0; i < group_count; i++) {
-					set.insert(i);
+					set.emplace(i);
 				}
 				select_node->groups.grouping_sets.push_back(std::move(set));
 			} else {
@@ -340,7 +340,7 @@ unique_ptr<QueryNode> StatementGenerator::GenerateQueryNode() {
 				while (true) {
 					GroupingSet set;
 					while (true) {
-						set.insert(RandomValue(group_count));
+						set.emplace(RandomValue(group_count));
 						if (RandomPercentage(50)) {
 							break;
 						}
@@ -373,8 +373,9 @@ unique_ptr<QueryNode> StatementGenerator::GenerateQueryNode() {
 		GenerateCTEs(*setop);
 		setop->setop_type = Choose<SetOperationType>({SetOperationType::EXCEPT, SetOperationType::INTERSECT,
 		                                              SetOperationType::UNION, SetOperationType::UNION_BY_NAME});
-		setop->left = GenerateQueryNode();
-		setop->right = GenerateQueryNode();
+		for(idx_t i = 0; i < 2; i++) {
+			setop->children.push_back(GenerateQueryNode());
+		}
 		switch (setop->setop_type) {
 		case SetOperationType::EXCEPT:
 		case SetOperationType::INTERSECT:
@@ -467,7 +468,9 @@ unique_ptr<TableRef> StatementGenerator::GenerateBaseTableRef() {
 	}
 	case CatalogType::VIEW_ENTRY: {
 		auto &view = entry.Cast<ViewCatalogEntry>();
-		column_count = view.types.size();
+		view.BindView(context);
+		auto view_columns = view.GetColumnInfo();
+		column_count = view_columns->types.size();
 		break;
 	}
 	default:

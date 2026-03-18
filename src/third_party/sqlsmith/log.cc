@@ -12,8 +12,6 @@
 
 #include "duckdb/common/vector.hpp"
 
-using namespace std;
-
 struct stats_visitor : prod_visitor {
 	int nodes = 0;
 	int maxlevel = 0;
@@ -27,7 +25,7 @@ struct stats_visitor : prod_visitor {
 		retries += p->retries;
 	}
 	void report() {
-		cerr << "production statistics" << endl;
+		std::cerr << "production statistics" << std::endl;
 		duckdb::vector<pair<const char *, long>> report;
 		for (auto p : production_stats)
 			report.push_back(p);
@@ -35,7 +33,7 @@ struct stats_visitor : prod_visitor {
 		    report.begin(), report.end(),
 		    [](const pair<std::string, long> &a, const pair<std::string, long> &b) { return a.second > b.second; });
 		for (auto p : report) {
-			cerr << p.second << "\t" << p.first << endl;
+			std::cerr << p.second << "\t" << p.first << std::endl;
 		}
 	}
 };
@@ -52,10 +50,10 @@ void stats_collecting_logger::generated(prod &query) {
 }
 
 void cerr_logger::report() {
-	cerr << endl << "queries: " << queries << endl;
+	std::cerr << std::endl << "queries: " << queries << std::endl;
 	// 	 << " (" << 1000.0*query_count/gen_time.count() << " gen/s, "
 	// 	 << 1000.0*query_count/query_time.count() << " exec/s)" << endl;
-	cerr << "AST stats (avg): height = " << sum_height / queries << " nodes = " << sum_nodes / queries << endl;
+	std::cerr << "AST stats (avg): height = " << sum_height / queries << " nodes = " << sum_nodes / queries << std::endl;
 
 	duckdb::vector<pair<std::string, long>> report;
 	for (auto e : errors) {
@@ -66,9 +64,9 @@ void cerr_logger::report() {
 	long err_count = 0;
 	for (auto e : report) {
 		err_count += e.second;
-		cerr << e.second << "\t" << e.first.substr(0, 80) << endl;
+		std::cerr << e.second << "\t" << e.first.substr(0, 80) << std::endl;
 	}
-	cerr << "error rate: " << (float)err_count / (queries) << endl;
+	std::cerr << "error rate: " << (float)err_count / (queries) << std::endl;
 	impedance::report();
 }
 
@@ -81,27 +79,27 @@ void cerr_logger::generated(prod &p) {
 void cerr_logger::executed(prod &query) {
 	(void)query;
 	if (columns - 1 == (queries % columns)) {
-		cerr << endl;
+		std::cerr << std::endl;
 	}
-	cerr << ".";
+	std::cerr << ".";
 }
 
 void cerr_logger::error(prod &query, const dut::failure &e) {
 	(void)query;
-	istringstream err(e.what());
+	std::istringstream err(e.what());
 	string line;
 
 	if (columns - 1 == (queries % columns)) {
-		cerr << endl;
+		std::cerr << std::endl;
 	}
 	getline(err, line);
 	errors[line]++;
 	if (dynamic_cast<const dut::timeout *>(&e))
-		cerr << "t";
+		std::cerr << "t";
 	else if (dynamic_cast<const dut::syntax *>(&e))
-		cerr << "S";
+		std::cerr << "S";
 	else if (dynamic_cast<const dut::broken *>(&e))
-		cerr << "C";
+		std::cerr << "C";
 	else
-		cerr << "e";
+		std::cerr << "e";
 }

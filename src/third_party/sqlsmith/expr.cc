@@ -11,7 +11,6 @@
 #include "impedance.hh"
 #include "expr.hh"
 
-using namespace std;
 using impedance::matched;
 
 shared_ptr<value_expr> value_expr::factory(prod *p, sqltype *type_constraint) {
@@ -32,7 +31,7 @@ shared_ptr<value_expr> value_expr::factory(prod *p, sqltype *type_constraint) {
 			return std::make_shared<column_reference>(p, type_constraint);
 		else
 			return std::make_shared<const_expr>(p, type_constraint);
-	} catch (runtime_error &e) {
+	} catch (std::runtime_error &e) {
 	}
 	p->retry();
 	return factory(p, type_constraint);
@@ -101,7 +100,7 @@ shared_ptr<bool_expr> bool_expr::factory(prod *p) {
 		else
 			return std::make_shared<exists_predicate>(p);
 		//     return std::make_shared<distinct_pred>(q);
-	} catch (runtime_error &e) {
+	} catch (std::runtime_error &e) {
 	}
 	p->retry();
 	return factory(p);
@@ -178,7 +177,7 @@ const_expr::const_expr(prod *p, sqltype *type_constraint) : value_expr(p), expr(
 	type = type_constraint ? type_constraint : scope->schema->inttype;
 
 	if (type == scope->schema->inttype)
-		expr = to_string(d100());
+		expr = std::to_string(d100());
 	else if (type == scope->schema->booltype)
 		expr += (d6() > 3) ? scope->schema->true_literal : scope->schema->false_literal;
 	else if (dynamic_cast<insert_stmt *>(p) && (d6() > 3))
