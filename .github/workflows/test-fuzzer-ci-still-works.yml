@@ -38,3 +38,6 @@ jobs:
       timeout-minutes: 20
       max_queries: 10
       enable_verification: ${{ matrix.enable_verification }}
+      repo: ${{ github.repository }}
+    secrets:
+      DUCKDB_HASH: ${{ needs.build-duckdb.outputs.hash }}
