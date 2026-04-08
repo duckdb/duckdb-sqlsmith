@@ -22,6 +22,8 @@ INTERNAL_ERROR_STRINGS = [
 ]
 
 INTERNAL_ERROR_FALSE_POSITIVES = [
+    ".internal",
+    "internal schema",
     "internal use",
     "internal_compress",
     "internal_decompress",
