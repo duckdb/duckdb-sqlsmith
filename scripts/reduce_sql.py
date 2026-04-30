@@ -53,14 +53,15 @@ def run_shell_command(shell, cmd):
 
 
 # reduce a single statement
-def get_reduced_sql(shell, sql_query):
+def get_reduce_candidates(shell, sql_query):
+    reduce_candidates = []
     reduce_query = get_reduced_query.replace('${QUERY}', sql_query.replace("'", "''"))
     (stdout, stderr, returncode) = run_shell_command(shell, reduce_query)
     if returncode != 0:
+        print(f"Failed to reduce query: {sql_query}")
         print(stdout)
         print(stderr)
-        raise Exception("Failed to reduce query")
-    reduce_candidates = []
+        return(reduce_candidates)
     for line in stdout.split('\n'):
         if len(line) <= 2:
             continue
@@ -77,7 +78,7 @@ def reduce(sql_query, data_load, shell, error_msg, max_time_seconds=300):
     start = time.time()
     while True:
         found_new_candidate = False
-        reduce_candidates = get_reduced_sql(shell, sql_query)
+        reduce_candidates = get_reduce_candidates(shell, sql_query)
         for reduce_candidate in reduce_candidates:
             if reduce_candidate == sql_query:
                 continue
@@ -190,7 +191,7 @@ def reduce_query_log_query(start, shell, queries, query_index, max_time_seconds)
     sql_query = queries[query_index]
     while True:
         found_new_candidate = False
-        reduce_candidates = get_reduced_sql(shell, sql_query)
+        reduce_candidates = get_reduce_candidates(shell, sql_query)
         for reduce_candidate in reduce_candidates:
             if reduce_candidate == sql_query:
                 continue
