@@ -96,8 +96,8 @@ private:
 
 	void GenerateAllScalar(ScalarFunctionCatalogEntry &scalar_function, vector<string> &result);
 	void GenerateAllAggregate(AggregateFunctionCatalogEntry &aggregate_function, vector<string> &result);
-	string GenerateTestAllTypes(BaseScalarFunction &base_function);
-	string GenerateTestVectorTypes(BaseScalarFunction &base_function);
+	string GenerateTestAllTypes(SimpleFunction &base_function);
+	string GenerateTestVectorTypes(SimpleFunction &base_function);
 	string GenerateCast(const LogicalType &target, const string &source_name, bool add_varchar);
 	bool FunctionArgumentsAlwaysNull(const string &name);
 
