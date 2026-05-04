@@ -1277,7 +1277,7 @@ bool StatementGenerator::FunctionArgumentsAlwaysNull(const string &name) {
 
 	return always_null_functions.find(name) != always_null_functions.end();
 }
-string StatementGenerator::GenerateTestAllTypes(BaseScalarFunction &base_function) {
+string StatementGenerator::GenerateTestAllTypes(SimpleFunction &base_function) {
 	auto select = make_uniq<SelectStatement>();
 	auto node = make_uniq<SelectNode>();
 
@@ -1310,7 +1310,7 @@ string StatementGenerator::GenerateTestAllTypes(BaseScalarFunction &base_functio
 	return select->ToString();
 }
 
-string StatementGenerator::GenerateTestVectorTypes(BaseScalarFunction &base_function) {
+string StatementGenerator::GenerateTestVectorTypes(SimpleFunction &base_function) {
 	auto select = make_uniq<SelectStatement>();
 	auto node = make_uniq<SelectNode>();
 
