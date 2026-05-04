@@ -18,6 +18,7 @@
 #include "duckdb/parser/statement/attach_statement.hpp"
 #include "duckdb/parser/statement/create_statement.hpp"
 #include "duckdb/parser/statement/delete_statement.hpp"
+#include "duckdb/parser/query_node/delete_query_node.hpp"
 #include "duckdb/parser/statement/detach_statement.hpp"
 #include "duckdb/parser/statement/insert_statement.hpp"
 #include "duckdb/parser/statement/multi_statement.hpp"
@@ -189,12 +190,12 @@ unique_ptr<DeleteStatement> StatementGenerator::GenerateDelete() {
 		if (entry.type == CatalogType::TABLE_ENTRY) {
 			auto result = make_uniq<BaseTableRef>();
 			result->table_name = entry.name;
-			delete_statement->table = std::move(result);
+			delete_statement->node->table = std::move(result);
 		} else {
-			delete_statement->table = GenerateTableRef();
+			delete_statement->node->table = GenerateTableRef();
 		}
 	} else {
-		delete_statement->table = GenerateTableRef();
+		delete_statement->node->table = GenerateTableRef();
 	}
 
 	return delete_statement;
@@ -302,7 +303,7 @@ void StatementGenerator::GenerateCTEs(QueryNode &node) {
 	}
 	while (RandomPercentage(20)) {
 		auto cte = make_uniq<CommonTableExpressionInfo>();
-		cte->query = unique_ptr_cast<SQLStatement, SelectStatement>(GenerateSelect());
+		cte->query_node = std::move(unique_ptr_cast<SQLStatement, SelectStatement>(GenerateSelect())->node);
 		for (idx_t i = 0; i < 1 + RandomValue(10); i++) {
 			cte->aliases.push_back(GenerateIdentifier());
 		}
@@ -806,6 +807,9 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateFunction() {
 		max_parameters = min_parameters;
 		break;
 	}
+	case CatalogType::WINDOW_FUNCTION_ENTRY:
+		//	FIXME: Use the function, not a random builtin
+		return GenerateWindowFunction();
 	default:
 		throw InternalException("StatementGenerator::GenerateFunction");
 	}
@@ -957,9 +961,12 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateWindowFunction(optional
 		case ExpressionType::WINDOW_NTILE:
 		case ExpressionType::WINDOW_FIRST_VALUE:
 		case ExpressionType::WINDOW_LAST_VALUE:
+			min_parameters = 1;
+			break;
 		case ExpressionType::WINDOW_LEAD:
 		case ExpressionType::WINDOW_LAG:
 			min_parameters = 1;
+			min_parameters = 3;
 			break;
 		case ExpressionType::WINDOW_NTH_VALUE:
 			min_parameters = 2;
@@ -970,7 +977,7 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateWindowFunction(optional
 		max_parameters = min_parameters;
 	}
 	WindowChecker checker(*this);
-	auto result = make_uniq<WindowExpression>(type, INVALID_CATALOG, INVALID_SCHEMA, std::move(name));
+	auto result = make_uniq<WindowExpression>(SYSTEM_CATALOG, DEFAULT_SCHEMA, std::move(name));
 	result->children = GenerateChildren(min_parameters, max_parameters);
 	while (RandomPercentage(50)) {
 		result->partitions.push_back(GenerateExpression());
@@ -1010,15 +1017,6 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateWindowFunction(optional
 	case WindowBoundary::EXPR_FOLLOWING_ROWS:
 	case WindowBoundary::EXPR_FOLLOWING_RANGE:
 		result->end_expr = GenerateExpression();
-		break;
-	default:
-		break;
-	}
-	switch (type) {
-	case ExpressionType::WINDOW_LEAD:
-	case ExpressionType::WINDOW_LAG:
-		result->offset_expr = RandomExpression(30);
-		result->default_expr = RandomExpression(30);
 		break;
 	default:
 		break;
