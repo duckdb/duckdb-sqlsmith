@@ -18,6 +18,7 @@
 #include "duckdb/parser/statement/attach_statement.hpp"
 #include "duckdb/parser/statement/create_statement.hpp"
 #include "duckdb/parser/statement/delete_statement.hpp"
+#include "duckdb/parser/query_node/delete_query_node.hpp"
 #include "duckdb/parser/statement/detach_statement.hpp"
 #include "duckdb/parser/statement/insert_statement.hpp"
 #include "duckdb/parser/statement/multi_statement.hpp"
@@ -189,12 +190,12 @@ unique_ptr<DeleteStatement> StatementGenerator::GenerateDelete() {
 		if (entry.type == CatalogType::TABLE_ENTRY) {
 			auto result = make_uniq<BaseTableRef>();
 			result->table_name = entry.name;
-			delete_statement->table = std::move(result);
+			delete_statement->node->table = std::move(result);
 		} else {
-			delete_statement->table = GenerateTableRef();
+			delete_statement->node->table = GenerateTableRef();
 		}
 	} else {
-		delete_statement->table = GenerateTableRef();
+		delete_statement->node->table = GenerateTableRef();
 	}
 
 	return delete_statement;
@@ -302,7 +303,7 @@ void StatementGenerator::GenerateCTEs(QueryNode &node) {
 	}
 	while (RandomPercentage(20)) {
 		auto cte = make_uniq<CommonTableExpressionInfo>();
-		cte->query = unique_ptr_cast<SQLStatement, SelectStatement>(GenerateSelect());
+		cte->query_node = std::move(unique_ptr_cast<SQLStatement, SelectStatement>(GenerateSelect())->node);
 		for (idx_t i = 0; i < 1 + RandomValue(10); i++) {
 			cte->aliases.push_back(GenerateIdentifier());
 		}
@@ -564,7 +565,7 @@ unique_ptr<TableRef> StatementGenerator::GenerateTableFunctionRef() {
 
 	auto result = make_uniq<TableFunctionRef>();
 	vector<unique_ptr<ParsedExpression>> children;
-	for (idx_t i = 0; i < table_function.arguments.size(); i++) {
+	for (idx_t i = 0; i < table_function.GetArguments().size(); i++) {
 		children.push_back(GenerateConstant());
 	}
 	vector<string> names;
@@ -575,7 +576,7 @@ unique_ptr<TableRef> StatementGenerator::GenerateTableFunctionRef() {
 		auto name = Choose(names);
 		names.erase(std::find(names.begin(), names.end(), name));
 		auto expr = GenerateConstant();
-		expr->alias = name;
+		expr->SetAlias(name);
 		children.push_back(std::move(expr));
 	}
 	result->function = make_uniq<FunctionExpression>(entry.name, std::move(children));
@@ -761,10 +762,12 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateFunction() {
 		auto offset = RandomValue(scalar_entry.functions.Size());
 		auto actual_function = scalar_entry.functions.GetFunctionByOffset(offset);
 		name = scalar_entry.name;
-		arguments = actual_function.arguments;
-		min_parameters = actual_function.arguments.size();
+		for (auto &arg : actual_function.GetSignature().GetParameters()) {
+			arguments.push_back(arg.GetType());
+		}
+		min_parameters = actual_function.GetSignature().GetParameterCount();
 		max_parameters = min_parameters;
-		if (actual_function.varargs.id() != LogicalTypeId::INVALID) {
+		if (actual_function.GetSignature().GetVarArgs().id() != LogicalTypeId::INVALID) {
 			max_parameters += 5;
 		}
 		break;
@@ -775,9 +778,9 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateFunction() {
 		    aggregate_entry.functions.GetFunctionByOffset(RandomValue(aggregate_entry.functions.Size()));
 
 		name = aggregate_entry.name;
-		min_parameters = actual_function.arguments.size();
+		min_parameters = actual_function.GetSignature().GetParameterCount();
 		max_parameters = min_parameters;
-		if (actual_function.varargs.id() != LogicalTypeId::INVALID) {
+		if (actual_function.GetVarArgs().id() != LogicalTypeId::INVALID) {
 			max_parameters += 5;
 		}
 		if (RandomPercentage(10) && !in_window) {
@@ -806,6 +809,9 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateFunction() {
 		max_parameters = min_parameters;
 		break;
 	}
+	case CatalogType::WINDOW_FUNCTION_ENTRY:
+		//	FIXME: Use the function, not a random builtin
+		return GenerateWindowFunction();
 	default:
 		throw InternalException("StatementGenerator::GenerateFunction");
 	}
@@ -940,7 +946,7 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateWindowFunction(optional
 	if (function) {
 		type = ExpressionType::WINDOW_AGGREGATE;
 		name = function->name;
-		min_parameters = function->arguments.size();
+		min_parameters = function->GetSignature().GetParameterCount();
 		max_parameters = min_parameters;
 	} else {
 		name = Choose<string>({"rank", "rank_dense", "percent_rank", "row_number", "first_value", "last_value",
@@ -957,9 +963,12 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateWindowFunction(optional
 		case ExpressionType::WINDOW_NTILE:
 		case ExpressionType::WINDOW_FIRST_VALUE:
 		case ExpressionType::WINDOW_LAST_VALUE:
+			min_parameters = 1;
+			break;
 		case ExpressionType::WINDOW_LEAD:
 		case ExpressionType::WINDOW_LAG:
 			min_parameters = 1;
+			min_parameters = 3;
 			break;
 		case ExpressionType::WINDOW_NTH_VALUE:
 			min_parameters = 2;
@@ -970,7 +979,7 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateWindowFunction(optional
 		max_parameters = min_parameters;
 	}
 	WindowChecker checker(*this);
-	auto result = make_uniq<WindowExpression>(type, INVALID_CATALOG, INVALID_SCHEMA, std::move(name));
+	auto result = make_uniq<WindowExpression>(SYSTEM_CATALOG, DEFAULT_SCHEMA, std::move(name));
 	result->children = GenerateChildren(min_parameters, max_parameters);
 	while (RandomPercentage(50)) {
 		result->partitions.push_back(GenerateExpression());
@@ -1010,15 +1019,6 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateWindowFunction(optional
 	case WindowBoundary::EXPR_FOLLOWING_ROWS:
 	case WindowBoundary::EXPR_FOLLOWING_RANGE:
 		result->end_expr = GenerateExpression();
-		break;
-	default:
-		break;
-	}
-	switch (type) {
-	case ExpressionType::WINDOW_LEAD:
-	case ExpressionType::WINDOW_LAG:
-		result->offset_expr = RandomExpression(30);
-		result->default_expr = RandomExpression(30);
 		break;
 	default:
 		break;
@@ -1279,25 +1279,25 @@ bool StatementGenerator::FunctionArgumentsAlwaysNull(const string &name) {
 
 	return always_null_functions.find(name) != always_null_functions.end();
 }
-string StatementGenerator::GenerateTestAllTypes(BaseScalarFunction &base_function) {
+string StatementGenerator::GenerateTestAllTypes(SimpleFunction &base_function) {
 	auto select = make_uniq<SelectStatement>();
 	auto node = make_uniq<SelectNode>();
 
-	bool always_null = FunctionArgumentsAlwaysNull(base_function.name);
+	bool always_null = FunctionArgumentsAlwaysNull(base_function.GetName());
 
 	vector<unique_ptr<ParsedExpression>> children;
-	for (auto &arg : base_function.arguments) {
+	for (auto &param : base_function.GetSignature().GetParameters()) {
 		// look up the type
 		unique_ptr<ParsedExpression> argument;
 		if (!always_null) {
 			for (auto &test_type : generator_context->test_types) {
-				if (test_type.type.id() == arg.id()) {
+				if (test_type.type.id() == param.GetType().id()) {
 					argument = make_uniq<ColumnRefExpression>(test_type.name);
 				}
 			}
 		}
 		if (!argument) {
-			argument = make_uniq<ConstantExpression>(Value(arg));
+			argument = make_uniq<ConstantExpression>(Value(param.GetType()));
 		}
 		children.push_back(std::move(argument));
 	}
@@ -1305,14 +1305,14 @@ string StatementGenerator::GenerateTestAllTypes(BaseScalarFunction &base_functio
 	from_clause->table_name = "all_types";
 	node->from_table = std::move(from_clause);
 
-	auto function_expr = make_uniq<FunctionExpression>(base_function.name, std::move(children));
+	auto function_expr = make_uniq<FunctionExpression>(base_function.GetName(), std::move(children));
 	node->select_list.push_back(std::move(function_expr));
 
 	select->node = std::move(node);
 	return select->ToString();
 }
 
-string StatementGenerator::GenerateTestVectorTypes(BaseScalarFunction &base_function) {
+string StatementGenerator::GenerateTestVectorTypes(SimpleFunction &base_function) {
 	auto select = make_uniq<SelectStatement>();
 	auto node = make_uniq<SelectNode>();
 
@@ -1321,17 +1321,17 @@ string StatementGenerator::GenerateTestVectorTypes(BaseScalarFunction &base_func
 	vector<unique_ptr<ParsedExpression>> children;
 	vector<unique_ptr<ParsedExpression>> test_vector_types;
 	vector<string> column_aliases;
-	for (auto &arg : base_function.arguments) {
+	for (auto &param : base_function.GetSignature().GetParameters()) {
 		unique_ptr<ParsedExpression> argument;
 		if (!always_null) {
 			string argument_name = "c" + to_string(column_aliases.size() + 1);
 			column_aliases.push_back(argument_name);
 			argument = make_uniq<ColumnRefExpression>(std::move(argument_name));
 			auto constant_expr = make_uniq<ConstantExpression>(Value());
-			auto cast = make_uniq<CastExpression>(arg, std::move(constant_expr));
+			auto cast = make_uniq<CastExpression>(param.GetType(), std::move(constant_expr));
 			test_vector_types.push_back(std::move(cast));
 		} else {
-			argument = make_uniq<ConstantExpression>(Value(arg));
+			argument = make_uniq<ConstantExpression>(Value(param.GetType()));
 		}
 		children.push_back(std::move(argument));
 	}

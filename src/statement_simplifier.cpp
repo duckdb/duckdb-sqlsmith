@@ -8,8 +8,11 @@
 #include "duckdb/parser/expression/list.hpp"
 #include "duckdb/parser/statement/delete_statement.hpp"
 #include "duckdb/parser/statement/insert_statement.hpp"
+#include "duckdb/parser/query_node/insert_query_node.hpp"
 #include "duckdb/parser/statement/prepare_statement.hpp"
 #include "duckdb/parser/statement/update_statement.hpp"
+#include "duckdb/parser/query_node/update_query_node.hpp"
+#include "duckdb/parser/query_node/delete_query_node.hpp"
 #include "duckdb/parser/statement/select_statement.hpp"
 #endif
 
@@ -206,7 +209,7 @@ void StatementSimplifier::Simplify(CommonTableExpressionMap &cte) {
 	SimplifyMap(cte.map);
 	for (auto &cte_child : cte.map) {
 		// simplify individual ctes
-		Simplify(cte_child.second->query->node);
+		Simplify(cte_child.second->query_node);
 	}
 }
 
@@ -357,8 +360,6 @@ void StatementSimplifier::SimplifyExpression(duckdb::unique_ptr<ParsedExpression
 		SimplifyChildExpression(expr, window.filter_expr);
 		SimplifyChildExpression(expr, window.start_expr);
 		SimplifyChildExpression(expr, window.end_expr);
-		SimplifyChildExpression(expr, window.offset_expr);
-		SimplifyChildExpression(expr, window.default_expr);
 		SimplifyEnum(window.ignore_nulls, false);
 		SimplifyEnum(window.distinct, false);
 		SimplifyEnum(window.start, WindowBoundary::UNBOUNDED_PRECEDING);
@@ -395,17 +396,19 @@ void StatementSimplifier::Simplify(SelectStatement &stmt) {
 }
 
 void StatementSimplifier::Simplify(InsertStatement &stmt) {
-	Simplify(stmt.cte_map);
-	Simplify(*stmt.select_statement);
-	SimplifyList(stmt.returning_list);
+	Simplify(stmt.node->cte_map);
+	if (stmt.node->select_statement) {
+		Simplify(*stmt.node->select_statement);
+	}
+	SimplifyList(stmt.node->returning_list);
 }
 
 void StatementSimplifier::Simplify(DeleteStatement &stmt) {
-	Simplify(stmt.cte_map);
-	SimplifyOptional(stmt.condition);
-	SimplifyExpression(stmt.condition);
-	SimplifyList(stmt.using_clauses);
-	SimplifyList(stmt.returning_list);
+	Simplify(stmt.node->cte_map);
+	SimplifyOptional(stmt.node->condition);
+	SimplifyExpression(stmt.node->condition);
+	SimplifyList(stmt.node->using_clauses);
+	SimplifyList(stmt.node->returning_list);
 }
 
 void StatementSimplifier::Simplify(UpdateSetInfo &info) {
@@ -432,11 +435,11 @@ void StatementSimplifier::Simplify(PrepareStatement &stmt) {
 }
 
 void StatementSimplifier::Simplify(UpdateStatement &stmt) {
-	Simplify(stmt.cte_map);
-	SimplifyOptional(stmt.from_table);
-	D_ASSERT(stmt.set_info);
-	Simplify(*stmt.set_info);
-	SimplifyList(stmt.returning_list);
+	Simplify(stmt.node->cte_map);
+	SimplifyOptional(stmt.node->from_table);
+	D_ASSERT(stmt.node->set_info);
+	Simplify(*stmt.node->set_info);
+	SimplifyList(stmt.node->returning_list);
 }
 
 void StatementSimplifier::Simplify(SQLStatement &stmt) {

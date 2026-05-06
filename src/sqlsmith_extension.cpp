@@ -118,7 +118,7 @@ static void ReduceSQLFunction(ClientContext &context, TableFunctionInput &data_p
 		output.data[0].SetValue(count, Value(entry));
 		count++;
 	}
-	output.SetCardinality(count);
+	output.SetChildCardinality(count);
 }
 
 struct FuzzyDuckFunctionData : public TableFunctionData {
