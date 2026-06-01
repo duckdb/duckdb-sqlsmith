@@ -27,6 +27,7 @@ INTERNAL_ERROR_FALSE_POSITIVES = [
     "internal use",
     "internal_compress",
     "internal_decompress",
+    "internal_tablefilter",
 ]
 
 fuzzer_desc = '''Issue found by ${FUZZER} on git commit hash [${SHORT_HASH}](https://github.com/duckdb/duckdb/commit/${FULL_HASH}) using seed ${SEED}.
