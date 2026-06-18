@@ -95,7 +95,7 @@ def get_fuzzer_name_printable(fuzzer):
         return 'Unknown'
 
 
-def run_shell_command(cmd, timeout=300):
+def run_shell_command(cmd, timeout=600):
     command = [shell, '--batch', '-init', '/dev/null']
     try:
         res = subprocess.run(command, input=bytearray(cmd, 'utf8'), stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
