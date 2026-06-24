@@ -95,9 +95,12 @@ def get_fuzzer_name_printable(fuzzer):
         return 'Unknown'
 
 
-def run_shell_command(cmd):
+def run_shell_command(cmd, timeout=600):
     command = [shell, '--batch', '-init', '/dev/null']
-    res = subprocess.run(command, input=bytearray(cmd, 'utf8'), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        res = subprocess.run(command, input=bytearray(cmd, 'utf8'), stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return ("", f"query timed out after {timeout} seconds", -1)
     stdout = res.stdout.decode('utf8', 'ignore').strip()
     stderr = res.stderr.decode('utf8', 'ignore').strip()
     return (stdout, stderr, res.returncode)
