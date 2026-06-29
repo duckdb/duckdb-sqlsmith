@@ -288,83 +288,87 @@ void StatementSimplifier::SimplifyExpression(duckdb::unique_ptr<ParsedExpression
 	switch (expr_class) {
 	case ExpressionClass::CONJUNCTION: {
 		auto &conj = expr->Cast<ConjunctionExpression>();
-		SimplifyExpressionList(expr, conj.children);
+		SimplifyExpressionList(expr, conj.GetChildrenMutable());
 		break;
 	}
 	case ExpressionClass::FUNCTION: {
 		auto &func = expr->Cast<FunctionExpression>();
-		SimplifyExpressionList(expr, func.children);
-		SimplifyEnum(func.distinct, false);
-		SimplifyOptionalExpression(func.filter);
-		SimplifyOptional(func.order_bys);
-		if (func.order_bys) {
-			Simplify(*func.order_bys);
+		for (auto &child : func.GetArgumentsMutable()) {
+			SimplifyChildExpression(expr, child.GetExpressionMutable());
+		}
+		SimplifyEnum(func.DistinctMutable(), false);
+		SimplifyOptionalExpression(func.FilterMutable());
+		SimplifyOptional(func.OrderByMutable());
+		if (func.OrderBy()) {
+			Simplify(*func.OrderByMutable());
 		}
 		break;
 	}
 	case ExpressionClass::OPERATOR: {
 		auto &op = expr->Cast<OperatorExpression>();
-		SimplifyExpressionList(expr, op.children);
+		SimplifyExpressionList(expr, op.GetChildrenMutable());
 		break;
 	}
 	case ExpressionClass::CASE: {
 		auto &op = expr->Cast<CaseExpression>();
-		SimplifyChildExpression(expr, op.else_expr);
-		for (auto &case_check : op.case_checks) {
+		SimplifyChildExpression(expr, op.ElseMutable());
+		for (auto &case_check : op.CaseChecksMutable()) {
 			SimplifyChildExpression(expr, case_check.then_expr);
 			SimplifyChildExpression(expr, case_check.when_expr);
 		}
-		SimplifyList(op.case_checks, false);
+		SimplifyList(op.CaseChecksMutable(), false);
 		break;
 	}
 	case ExpressionClass::CAST: {
 		auto &cast = expr->Cast<CastExpression>();
-		SimplifyChildExpression(expr, cast.child);
+		SimplifyChildExpression(expr, cast.ChildMutable());
 		break;
 	}
 	case ExpressionClass::COLLATE: {
 		auto &collate = expr->Cast<CollateExpression>();
-		SimplifyChildExpression(expr, collate.child);
+		SimplifyChildExpression(expr, collate.ChildMutable());
 		break;
 	}
 	case ExpressionClass::SUBQUERY: {
 		auto &subq = expr->Cast<SubqueryExpression>();
 		// try to move this subquery fully into the outer query
 		if (!query_nodes.empty()) {
-			SimplifyReplace(query_nodes.back().get(), subq.subquery->node);
+			SimplifyReplace(query_nodes.back().get(), subq.SubqueryMutable()->node);
 		}
-		SimplifyChildExpression(expr, subq.child);
-		Simplify(subq.subquery->node);
+		SimplifyChildExpression(expr, subq.GetChildMutable());
+		Simplify(subq.SubqueryMutable()->node);
 		break;
 	}
 	case ExpressionClass::COMPARISON: {
 		auto &comp = expr->Cast<ComparisonExpression>();
-		SimplifyChildExpression(expr, comp.left);
-		SimplifyChildExpression(expr, comp.right);
+		SimplifyChildExpression(expr, comp.LeftMutable());
+		SimplifyChildExpression(expr, comp.RightMutable());
 		break;
 	}
 	case ExpressionClass::STAR: {
 		auto &star = expr->Cast<StarExpression>();
-		SimplifyMap(star.replace_list);
-		SimplifySet(star.exclude_list);
-		for (auto &entry : star.replace_list) {
+		SimplifyMap(star.ReplaceListMutable());
+		SimplifySet(star.ExcludeListMutable());
+		for (auto &entry : star.ReplaceListMutable()) {
 			SimplifyChildExpression(expr, entry.second);
 		}
 		break;
 	}
 	case ExpressionClass::WINDOW: {
 		auto &window = expr->Cast<WindowExpression>();
-		SimplifyExpressionList(expr, window.children);
-		SimplifyExpressionList(expr, window.partitions);
-		SimplifyList(window.orders);
-		SimplifyChildExpression(expr, window.filter_expr);
-		SimplifyChildExpression(expr, window.start_expr);
-		SimplifyChildExpression(expr, window.end_expr);
-		SimplifyEnum(window.ignore_nulls, false);
-		SimplifyEnum(window.distinct, false);
-		SimplifyEnum(window.start, WindowBoundary::UNBOUNDED_PRECEDING);
-		SimplifyEnum(window.end, WindowBoundary::CURRENT_ROW_RANGE);
-		SimplifyEnum(window.exclude_clause, WindowExcludeMode::NO_OTHER);
+		for (auto &child : window.GetArgumentsMutable()) {
+			SimplifyChildExpression(expr, child.GetExpressionMutable());
+		}
+		SimplifyExpressionList(expr, window.PartitionsMutable());
+		SimplifyList(window.OrderByMutable());
+		SimplifyChildExpression(expr, window.FilterMutable());
+		SimplifyChildExpression(expr, window.StartExprMutable());
+		SimplifyChildExpression(expr, window.EndExprMutable());
+		SimplifyEnum(window.IgnoreNullsMutable(), false);
+		SimplifyEnum(window.DistinctMutable(), false);
+		SimplifyEnum(window.WindowStartMutable(), WindowBoundary::UNBOUNDED_PRECEDING);
+		SimplifyEnum(window.WindowEndMutable(), WindowBoundary::CURRENT_ROW_RANGE);
+		SimplifyEnum(window.WindowExcludeMutable(), WindowExcludeMode::NO_OTHER);
 		break;
 	}
 	default:
