@@ -283,7 +283,7 @@ void StatementSimplifier::SimplifyExpression(duckdb::unique_ptr<ParsedExpression
 	default:
 		break;
 	}
-	duckdb::unique_ptr<ParsedExpression> constant = make_uniq<ConstantExpression>(Value());
+	duckdb::unique_ptr<ParsedExpression> constant = ConstantExpression::Null();
 	SimplifyReplace(expr, constant);
 	switch (expr_class) {
 	case ExpressionClass::CONJUNCTION: {

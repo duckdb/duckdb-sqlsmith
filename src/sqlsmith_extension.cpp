@@ -28,7 +28,7 @@ struct SQLSmithFunctionData : public TableFunctionData {
 };
 
 static duckdb::unique_ptr<FunctionData> SQLSmithBind(ClientContext &context, TableFunctionBindInput &input,
-                                                     vector<LogicalType> &return_types, vector<string> &names) {
+                                                     vector<LogicalType> &return_types, vector<Identifier> &names) {
 	auto result = make_uniq<SQLSmithFunctionData>();
 	for (auto &kv : input.named_parameters) {
 		if (kv.first == "seed") {
@@ -87,7 +87,7 @@ struct ReduceSQLFunctionData : public TableFunctionData {
 };
 
 static duckdb::unique_ptr<FunctionData> ReduceSQLBind(ClientContext &context, TableFunctionBindInput &input,
-                                                      vector<LogicalType> &return_types, vector<string> &names) {
+                                                      vector<LogicalType> &return_types, vector<Identifier> &names) {
 	return_types.emplace_back(LogicalType::VARCHAR);
 	names.emplace_back("sql");
 
@@ -130,7 +130,7 @@ struct FuzzyDuckFunctionData : public TableFunctionData {
 };
 
 static duckdb::unique_ptr<FunctionData> FuzzyDuckBind(ClientContext &context, TableFunctionBindInput &input,
-                                                      vector<LogicalType> &return_types, vector<string> &names) {
+                                                      vector<LogicalType> &return_types, vector<Identifier> &names) {
 	auto result = make_uniq<FuzzyDuckFunctionData>(context);
 	for (auto &kv : input.named_parameters) {
 		if (kv.first == "seed") {
@@ -177,36 +177,45 @@ static void FuzzAllFunctions(ClientContext &context, TableFunctionInput &data_p,
 static void LoadInternal(ExtensionLoader &loader) {
 
 	TableFunction sqlsmith_func("sqlsmith", {}, SQLSmithFunction, SQLSmithBind);
-	sqlsmith_func.named_parameters["seed"] = LogicalType::INTEGER;
-	sqlsmith_func.named_parameters["max_queries"] = LogicalType::UBIGINT;
-	sqlsmith_func.named_parameters["max_query_length"] = LogicalType::UBIGINT;
-	sqlsmith_func.named_parameters["exclude_catalog"] = LogicalType::BOOLEAN;
-	sqlsmith_func.named_parameters["dump_all_queries"] = LogicalType::BOOLEAN;
-	sqlsmith_func.named_parameters["dump_all_graphs"] = LogicalType::BOOLEAN;
-	sqlsmith_func.named_parameters["verbose_output"] = LogicalType::BOOLEAN;
-	sqlsmith_func.named_parameters["complete_log"] = LogicalType::VARCHAR;
-	sqlsmith_func.named_parameters["log"] = LogicalType::VARCHAR;
+	sqlsmith_func.GetSignature().WithTypedKwargs("options", [&](TypedKwargs &options) {
+		options.Add("seed", LogicalType::INTEGER)
+		    .Add("max_queries", LogicalType::UBIGINT)
+		    .Add("max_query_length", LogicalType::UBIGINT)
+		    .Add("exclude_catalog", LogicalType::BOOLEAN)
+		    .Add("dump_all_queries", LogicalType::BOOLEAN)
+		    .Add("dump_all_graphs", LogicalType::BOOLEAN)
+		    .Add("verbose_output", LogicalType::BOOLEAN)
+		    .Add("complete_log", LogicalType::VARCHAR)
+		    .Add("log", LogicalType::VARCHAR);
+	});
 	loader.RegisterFunction(sqlsmith_func);
 
 	TableFunction fuzzy_duck_fun("fuzzyduck", {}, FuzzyDuckFunction, FuzzyDuckBind);
-	fuzzy_duck_fun.named_parameters["seed"] = LogicalType::INTEGER;
-	fuzzy_duck_fun.named_parameters["max_queries"] = LogicalType::UBIGINT;
-	fuzzy_duck_fun.named_parameters["max_query_length"] = LogicalType::UBIGINT;
-	fuzzy_duck_fun.named_parameters["log"] = LogicalType::VARCHAR;
-	fuzzy_duck_fun.named_parameters["complete_log"] = LogicalType::VARCHAR;
-	fuzzy_duck_fun.named_parameters["verbose_output"] = LogicalType::BOOLEAN;
-	fuzzy_duck_fun.named_parameters["enable_verification"] = LogicalType::BOOLEAN;
+	fuzzy_duck_fun.GetSignature().WithTypedKwargs("options", [&](TypedKwargs &options) {
+		options.Add("seed", LogicalType::INTEGER)
+		    .Add("max_queries", LogicalType::UBIGINT)
+		    .Add("max_query_length", LogicalType::UBIGINT)
+		    .Add("log", LogicalType::VARCHAR)
+		    .Add("complete_log", LogicalType::VARCHAR)
+		    .Add("verbose_output", LogicalType::BOOLEAN)
+		    .Add("enable_verification", LogicalType::BOOLEAN);
+	});
 	loader.RegisterFunction(fuzzy_duck_fun);
 
 	TableFunction fuzz_all_functions("fuzz_all_functions", {}, FuzzAllFunctions, FuzzyDuckBind);
-	fuzz_all_functions.named_parameters["seed"] = LogicalType::INTEGER;
-	fuzz_all_functions.named_parameters["max_query_length"] = LogicalType::UBIGINT;
-	fuzz_all_functions.named_parameters["log"] = LogicalType::VARCHAR;
-	fuzz_all_functions.named_parameters["complete_log"] = LogicalType::VARCHAR;
-	fuzz_all_functions.named_parameters["verbose_output"] = LogicalType::BOOLEAN;
+	fuzz_all_functions.GetSignature().WithTypedKwargs("options", [&](TypedKwargs &options) {
+		options.Add("seed", LogicalType::INTEGER)
+		    .Add("max_query_length", LogicalType::UBIGINT)
+		    .Add("log", LogicalType::VARCHAR)
+		    .Add("complete_log", LogicalType::VARCHAR)
+		    .Add("verbose_output", LogicalType::BOOLEAN);
+	});
 	loader.RegisterFunction(fuzz_all_functions);
 
-	TableFunction reduce_sql_function("reduce_sql_statement", {LogicalType::VARCHAR}, ReduceSQLFunction, ReduceSQLBind);
+	FunctionSignature reduce_sql_signature;
+	reduce_sql_signature.AddParameter("statement", LogicalType::VARCHAR);
+	TableFunction reduce_sql_function("reduce_sql_statement", std::move(reduce_sql_signature), ReduceSQLFunction,
+	                                  ReduceSQLBind);
 	loader.RegisterFunction(reduce_sql_function);
 }
 void SqlsmithExtension::Load(ExtensionLoader &loader) {
