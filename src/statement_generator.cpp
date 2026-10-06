@@ -170,10 +170,10 @@ unique_ptr<DetachStatement> StatementGenerator::GenerateDetach() {
 
 // generate USE statement
 unique_ptr<SetStatement> StatementGenerator::GenerateSet() {
-	auto name_expr = make_uniq<ConstantExpression>(GenerateDataBaseName());
+	auto name_expr = ConstantExpression::FromValue(GenerateDataBaseName());
 	if (RandomPercentage(90)) {
 		auto name = GetRandomAttachedDataBase();
-		name_expr = make_uniq<ConstantExpression>(Value(name));
+		name_expr = ConstantExpression::FromValue(Value(name));
 	}
 	auto set = make_uniq<SetVariableStatement>("schema", std::move(name_expr), SetScope::AUTOMATIC);
 	return unique_ptr_cast<duckdb::SetVariableStatement, duckdb::SetStatement>(std::move(set));
@@ -571,16 +571,24 @@ unique_ptr<TableRef> StatementGenerator::GenerateTableFunctionRef() {
 		table_function_ref = &generator_context->table_functions[random_val];
 	}
 	auto &entry = table_function_ref->get().Cast<TableFunctionCatalogEntry>();
-	auto table_function = entry.functions.GetFunctionByOffset(RandomValue(entry.functions.Size()));
+	auto table_function = *entry.functions.GetFunctionByOffset(RandomValue(entry.functions.Size()));
 
 	auto result = make_uniq<TableFunctionRef>();
 	vector<unique_ptr<ParsedExpression>> children;
-	for (idx_t i = 0; i < table_function.GetArguments().size(); i++) {
+	auto &signature = table_function.GetSignature();
+	for (idx_t i = 0; i < signature.GetPositionalParameterCount(); i++) {
 		children.push_back(GenerateConstant());
 	}
 	vector<Identifier> names;
-	for (auto &e : table_function.named_parameters) {
-		names.push_back(e.first);
+	for (auto &param : signature.GetParameters()) {
+		if (param.GetKind() == FunctionParameterKind::KEYWORD_ONLY) {
+			names.push_back(param.GetName());
+		}
+	}
+	if (auto options = signature.GetTypedKwargs()) {
+		for (auto &option : options->GetOptions()) {
+			names.push_back(option.name);
+		}
 	}
 	while (!names.empty() && RandomPercentage(50)) {
 		auto name = Choose(names);
@@ -727,7 +735,7 @@ Value StatementGenerator::GenerateConstantValue() {
 }
 
 unique_ptr<ParsedExpression> StatementGenerator::GenerateConstant() {
-	return make_uniq<ConstantExpression>(GenerateConstantValue());
+	return ConstantExpression::FromValue(GenerateConstantValue());
 }
 
 LogicalType StatementGenerator::GenerateLogicalType() {
@@ -770,14 +778,14 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateFunction() {
 	case CatalogType::SCALAR_FUNCTION_ENTRY: {
 		auto &scalar_entry = function.Cast<ScalarFunctionCatalogEntry>();
 		auto offset = RandomValue(scalar_entry.functions.Size());
-		auto actual_function = scalar_entry.functions.GetFunctionByOffset(offset);
+		auto actual_function = *scalar_entry.functions.GetFunctionByOffset(offset);
 		name = scalar_entry.name.GetIdentifierName();
 		for (auto &arg : actual_function.GetSignature().GetParameters()) {
 			arguments.push_back(arg.GetType());
 		}
 		min_parameters = actual_function.GetSignature().GetParameterCount();
 		max_parameters = min_parameters;
-		if (actual_function.GetSignature().GetVarArgs().id() != LogicalTypeId::INVALID) {
+		if (actual_function.GetSignature().GetArgs()) {
 			max_parameters += 5;
 		}
 		break;
@@ -785,12 +793,12 @@ unique_ptr<ParsedExpression> StatementGenerator::GenerateFunction() {
 	case CatalogType::AGGREGATE_FUNCTION_ENTRY: {
 		auto &aggregate_entry = function.Cast<AggregateFunctionCatalogEntry>();
 		auto actual_function =
-		    aggregate_entry.functions.GetFunctionByOffset(RandomValue(aggregate_entry.functions.Size()));
+		    *aggregate_entry.functions.GetFunctionByOffset(RandomValue(aggregate_entry.functions.Size()));
 
 		name = aggregate_entry.name.GetIdentifierName();
 		min_parameters = actual_function.GetSignature().GetParameterCount();
 		max_parameters = min_parameters;
-		if (actual_function.GetVarArgs().id() != LogicalTypeId::INVALID) {
+		if (actual_function.GetSignature().GetArgs()) {
 			max_parameters += 5;
 		}
 		if (RandomPercentage(10) && !in_window) {
@@ -1310,7 +1318,7 @@ string StatementGenerator::GenerateTestAllTypes(SimpleFunction &base_function) {
 			}
 		}
 		if (!argument) {
-			argument = make_uniq<ConstantExpression>(Value(param.GetType()));
+			argument = ConstantExpression::FromValue(Value(param.GetType()));
 		}
 		children.push_back(std::move(argument));
 	}
@@ -1340,11 +1348,11 @@ string StatementGenerator::GenerateTestVectorTypes(SimpleFunction &base_function
 			string argument_name = "c" + to_string(column_aliases.size() + 1);
 			column_aliases.emplace_back(argument_name);
 			argument = make_uniq<ColumnRefExpression>(Identifier(std::move(argument_name)));
-			auto constant_expr = make_uniq<ConstantExpression>(Value());
+			auto constant_expr = ConstantExpression::Null();
 			auto cast = make_uniq<CastExpression>(param.GetType(), std::move(constant_expr));
 			test_vector_types.push_back(std::move(cast));
 		} else {
-			argument = make_uniq<ConstantExpression>(Value(param.GetType()));
+			argument = ConstantExpression::FromValue(Value(param.GetType()));
 		}
 		children.push_back(std::move(argument));
 	}
@@ -1384,7 +1392,7 @@ string StatementGenerator::GenerateCast(const LogicalType &target, const string 
 
 void StatementGenerator::GenerateAllScalar(ScalarFunctionCatalogEntry &scalar_function, vector<string> &result) {
 	for (idx_t offset = 0; offset < scalar_function.functions.Size(); offset++) {
-		auto function = scalar_function.functions.GetFunctionByOffset(offset);
+		auto function = *scalar_function.functions.GetFunctionByOffset(offset);
 
 		result.push_back(GenerateTestAllTypes(function));
 		result.push_back(GenerateTestVectorTypes(function));
@@ -1394,7 +1402,7 @@ void StatementGenerator::GenerateAllScalar(ScalarFunctionCatalogEntry &scalar_fu
 void StatementGenerator::GenerateAllAggregate(AggregateFunctionCatalogEntry &aggregate_function,
                                               vector<string> &result) {
 	for (idx_t offset = 0; offset < aggregate_function.functions.Size(); offset++) {
-		auto function = aggregate_function.functions.GetFunctionByOffset(offset);
+		auto function = *aggregate_function.functions.GetFunctionByOffset(offset);
 
 		result.push_back(GenerateTestAllTypes(function));
 		result.push_back(GenerateTestVectorTypes(function));
