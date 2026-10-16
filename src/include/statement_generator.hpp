@@ -102,6 +102,7 @@ private:
 	string GenerateTestVectorTypes(SimpleFunction &base_function);
 	string GenerateCast(const LogicalType &target, const string &source_name, bool add_varchar);
 	bool FunctionArgumentsAlwaysNull(const string &name);
+	unique_ptr<ParsedExpression> GenerateNullArgument(const LogicalType &type);
 
 	bool RandomBoolean();
 	string RandomString(idx_t length);

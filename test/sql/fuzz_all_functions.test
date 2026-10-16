@@ -1,0 +1,12 @@
+# name: test/sql/fuzz_all_functions.test
+# description: fuzz_all_functions generates a call for every function, including ones with ANY or template parameters
+# group: [fuzzyduck]
+
+require sqlsmith
+
+statement ok
+create table all_types as select * exclude(small_enum, medium_enum, large_enum) from test_all_types() limit 0;
+
+# max_query_length=1 stops before the first query runs, so only generation is exercised
+statement ok
+call fuzz_all_functions(max_query_length=1, log='__TEST_DIR__/log.txt', complete_log='__TEST_DIR__/clog.txt');
