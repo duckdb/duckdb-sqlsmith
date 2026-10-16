@@ -93,7 +93,7 @@ static duckdb::unique_ptr<FunctionData> ReduceSQLBind(ClientContext &context, Ta
 
 	auto result = make_uniq<ReduceSQLFunctionData>();
 	auto sql = input.inputs[0].ToString();
-	Parser parser;
+	Parser parser(context);
 	parser.ParseQuery(sql);
 	if (parser.statements.size() != 1) {
 		throw InvalidInputException("reduce_sql_statement requires a single statement as parameter");

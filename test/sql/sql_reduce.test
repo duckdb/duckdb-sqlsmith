@@ -90,3 +90,21 @@ PREPARE v1 AS SELECT a, b
 PREPARE v1 AS SELECT a, b FROM tbl
 PREPARE v1 AS SELECT a, b FROM tbl
 PREPARE v1 AS SELECT b FROM tbl
+
+# SQL reduction uses the connection's parser settings.
+statement ok
+SET preserve_identifier_case = false
+
+query II
+SELECT bool_or(contains(sql, 'mixedcase')), bool_and(NOT contains(sql, 'MixedCase'))
+FROM reduce_sql_statement('SELECT MixedCase')
+----
+true	true
+
+statement ok
+SET preserve_identifier_case = true
+
+query I
+SELECT bool_or(contains(sql, 'MixedCase')) FROM reduce_sql_statement('SELECT MixedCase')
+----
+true
