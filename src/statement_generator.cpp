@@ -2,6 +2,7 @@
 
 #include "duckdb/catalog/catalog_entry/list.hpp"
 #include "duckdb/common/random_engine.hpp"
+#include "duckdb/common/type_visitor.hpp"
 #include "duckdb/common/types/uuid.hpp"
 #include "duckdb/function/table/system_functions.hpp"
 #include "duckdb/main/attached_database.hpp"
@@ -1300,6 +1301,14 @@ bool StatementGenerator::FunctionArgumentsAlwaysNull(const string &name) {
 
 	return always_null_functions.find(name) != always_null_functions.end();
 }
+unique_ptr<ParsedExpression> StatementGenerator::GenerateNullArgument(const LogicalType &type) {
+	// ANY, TEMPLATE, LAMBDA and child-less nested types have no SQL spelling, so CAST(NULL AS <type>) cannot be built
+	if (!type.IsComplete() || TypeVisitor::Contains(type, LogicalTypeId::LAMBDA)) {
+		return ConstantExpression::Null();
+	}
+	return ConstantExpression::FromValue(Value(type));
+}
+
 string StatementGenerator::GenerateTestAllTypes(SimpleFunction &base_function) {
 	auto select = make_uniq<SelectStatement>();
 	auto node = make_uniq<SelectNode>();
@@ -1318,7 +1327,7 @@ string StatementGenerator::GenerateTestAllTypes(SimpleFunction &base_function) {
 			}
 		}
 		if (!argument) {
-			argument = ConstantExpression::FromValue(Value(param.GetType()));
+			argument = GenerateNullArgument(param.GetType());
 		}
 		children.push_back(std::move(argument));
 	}
@@ -1348,11 +1357,9 @@ string StatementGenerator::GenerateTestVectorTypes(SimpleFunction &base_function
 			string argument_name = "c" + to_string(column_aliases.size() + 1);
 			column_aliases.emplace_back(argument_name);
 			argument = make_uniq<ColumnRefExpression>(Identifier(std::move(argument_name)));
-			auto constant_expr = ConstantExpression::Null();
-			auto cast = make_uniq<CastExpression>(param.GetType(), std::move(constant_expr));
-			test_vector_types.push_back(std::move(cast));
+			test_vector_types.push_back(GenerateNullArgument(param.GetType()));
 		} else {
-			argument = ConstantExpression::FromValue(Value(param.GetType()));
+			argument = GenerateNullArgument(param.GetType());
 		}
 		children.push_back(std::move(argument));
 	}
